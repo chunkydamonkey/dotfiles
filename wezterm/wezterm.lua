@@ -18,10 +18,10 @@ config.font = wezterm.font("Hack Nerd Font") -- Hack ships Regular + Bold only
 config.font_size = 12.0
 config.max_fps = 120
 
--- One unified bar (window buttons integrated into the tab bar), hidden when a
--- single tab is open.
+-- One unified bar (window buttons integrated into the tab bar), always visible
+-- (even with a single tab open).
 config.window_decorations = "INTEGRATED_BUTTONS|RESIZE"
-config.hide_tab_bar_if_only_one_tab = true
+config.hide_tab_bar_if_only_one_tab = false
 config.window_frame = {
   font = wezterm.font("Hack Nerd Font", { weight = "Bold" }),
   font_size = 10.0,
