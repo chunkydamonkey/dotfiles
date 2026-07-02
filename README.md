@@ -29,17 +29,35 @@ data), and re-running is safe. Use `./install.sh --dry-run` to preview.
 
 ## Setup on a fresh machine
 
-**Windows** (WezTerm on the host) — PowerShell:
+Everything (config + fonts) is in the repo, so a new machine only needs a few
+tools, one auth, a clone, and one script.
+
+### Fresh Windows machine (WezTerm)
 
 ```powershell
-git clone https://github.com/chunkydamonkey/dotfiles.git "$HOME\dotfiles"
-cd "$HOME\dotfiles"
-powershell -ExecutionPolicy Bypass -File .\install.ps1
+# 1. Install tools (Windows Terminal is preinstalled on Win11)
+winget install --id Git.Git -e --accept-package-agreements --accept-source-agreements
+winget install --id GitHub.cli -e
+winget install --id wez.wezterm -e
+
+# 2. Open a NEW terminal (so git/gh land on PATH), then authenticate
+gh auth login                    # GitHub.com → HTTPS → login with browser
+
+# 3. Clone the private repo (gh provides auth) + bootstrap
+gh repo clone chunkydamonkey/dotfiles "$HOME\dotfiles"
+powershell -ExecutionPolicy Bypass -File "$HOME\dotfiles\install.ps1"
+
+# 4. Launch WezTerm — config + Hack font come from the repo.
 ```
 
-**WSL2 / Linux / macOS** (shell environment):
+### WSL2 / Linux / macOS (shell environment)
+
+On a fresh Windows box, first run `wsl --install` (installs WSL2 + Ubuntu),
+reboot, and create your Linux user. Then inside the distro:
 
 ```bash
+sudo apt update && sudo apt install -y git gh   # gh via apt on recent Ubuntu; else cli.github.com
+gh auth login
 git clone https://github.com/chunkydamonkey/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./install.sh --dry-run   # preview — shows what it would back up/link
@@ -47,7 +65,7 @@ cd ~/dotfiles
 exec bash -l             # reload the shell
 ```
 
-Then set your git identity in an untracked `~/.gitconfig.local` (the tracked
+Finally set your git identity in an untracked `~/.gitconfig.local` (the tracked
 gitconfig `include`s it, so no personal/work email lives in the repo):
 
 ```ini
