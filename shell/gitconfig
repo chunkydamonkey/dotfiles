@@ -1,0 +1,20 @@
+# Machine-agnostic git config. Per-machine identity (user.name / user.email)
+# lives in an untracked ~/.gitconfig.local — a missing include is silently
+# ignored, so fresh machines don't error until you create it.
+[include]
+	path = ~/.gitconfig.local
+[pull]
+	rebase = true
+[push]
+	autoSetupRemote = true
+[filter "lfs"]
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+	clean = git-lfs clean -- %f
+[credential "https://github.com"]
+	helper =
+	helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !gh auth git-credential

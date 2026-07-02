@@ -6,3 +6,31 @@ desktop.ini
 # Editor cruft
 *.swp
 *~
+
+# ── Secrets / never commit (defense-in-depth) ───────────────────────────────
+.aws/
+**/credentials
+.ssh/
+*.pem
+*.key
+id_ed25519*
+id_rsa*
+**/hosts.yml
+# Shell history & session state
+*_history
+.ssh/agent.env
+# Tool / assistant state
+.claude.json
+.claude/
+# Version-manager state
+.nvm/
+.pyenv/
+.bun/
+# Machine-local git identity
+gitconfig.local
+shell/gitconfig.local
+# Our own backups
+*.pre-dotfiles.*
+.bashrc.bak.*
+.bashrc_old
+.bashrc2

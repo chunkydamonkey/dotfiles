@@ -1,0 +1,294 @@
+#!/bin/bash
+# ~/.bashrc — WSL2 Debian | modernised 2026
+# ──────────────────────────────────────────
+
+# Not interactive? bail early
+[[ $- != *i* ]] && return
+
+# ── Completions ────────────────────────────────────────────────────────────────
+if [[ -f /usr/share/bash-completion/bash_completion ]]; then
+    . /usr/share/bash-completion/bash_completion
+elif [[ -f /etc/bash_completion ]]; then
+    . /etc/bash_completion
+fi
+
+# ── History ────────────────────────────────────────────────────────────────────
+HISTSIZE=10000
+HISTFILESIZE=50000
+HISTCONTROL=erasedups:ignoredups:ignorespace
+HISTTIMEFORMAT="%F %T  "        # timestamps in history
+shopt -s histappend             # don't clobber history on exit
+shopt -s cmdhist                # multi-line commands as one entry
+PROMPT_COMMAND='history -a'     # write each command immediately
+
+# ── Shell options ──────────────────────────────────────────────────────────────
+shopt -s checkwinsize           # keep $LINES/$COLUMNS accurate
+shopt -s globstar               # ** recursive globs
+shopt -s autocd                 # type a dir name to cd into it
+shopt -s cdspell                # fix minor cd typos
+
+stty -ixon                      # free up ctrl-S / ctrl-Q for history
+
+# ── Completion tweaks ──────────────────────────────────────────────────────────
+bind "set completion-ignore-case on"
+bind "set show-all-if-ambiguous on"
+bind "set mark-symlinked-directories on"
+
+# ── Colours ────────────────────────────────────────────────────────────────────
+export CLICOLOR=1
+export LS_COLORS='di=1;34:ln=1;36:ex=1;32:*.tar=1;31:*.gz=1;31:*.zip=1;31:*.jpg=1;35:*.png=1;35:*.mp3=1;35'
+export GREP_COLORS='mt=1;33'
+
+# ── Default tools ──────────────────────────────────────────────────────────────
+export EDITOR=vim
+export VISUAL=vim
+export PAGER=less
+export LESS='-R --quit-if-one-screen --no-init'
+
+# ── WSL2: Windows interop ──────────────────────────────────────────────────────
+# Lets you open Windows Explorer / apps from the terminal
+export BROWSER='/mnt/c/Windows/explorer.exe'
+alias open='explorer.exe'          # open . → opens current folder in Explorer
+alias pbcopy='clip.exe'            # echo "hello" | pbcopy
+alias pbpaste='powershell.exe -command "Get-Clipboard"'
+
+# Open Windows Terminal with a 4-pane dev layout in the current (or given) directory
+#   dev-layout              # uses $PWD
+#   dev-layout ~/projects/foo
+dev-layout() {
+    local DIR WIN_DIR TAB_TITLE
+    if [[ -z "$1" ]]; then
+        DIR="$PWD"
+    else
+        DIR=$(realpath -m "$1")
+    fi
+    WIN_DIR=$(wslpath -w "$DIR")
+    TAB_TITLE=$(basename "$DIR")
+
+    wt.exe -w 0 new-tab -p "Debian" -d "$WIN_DIR" \
+        --title "$TAB_TITLE" --suppressApplicationTitle \
+        \; split-pane -V -p "Debian" -d "$WIN_DIR" \
+        \; split-pane -H -p "Debian" -d "$WIN_DIR" \
+        \; split-pane -V -p "Debian" -d "$WIN_DIR"
+}
+
+# ── Vim clipboard → Windows ────────────────────────────────────────────────────
+# In vim: "+y  to copy to Windows clipboard
+#         "+p  to paste from Windows clipboard
+# This makes the system clipboard ("+) route through clip.exe automatically.
+# No extra packages needed in Windows Terminal.
+if [[ -z "$DISPLAY" ]]; then
+    export DISPLAY=:0   # keeps some vim plugins happy even without X
+fi
+# Tell vim to use the Windows clipboard when launched from WSL
+# (The actual vim config lives in ~/.vimrc — see note at bottom)
+
+# ── Git branch helper (used in prompt) ────────────────────────────────────────
+__git_branch() {
+    local branch
+    branch=$(git symbolic-ref --short HEAD 2>/dev/null) ||
+    branch=$(git rev-parse --short HEAD 2>/dev/null)    # detached HEAD → show hash
+    [[ -n "$branch" ]] && echo " ($branch)"
+}
+
+__git_dirty() {
+    # prints * if working tree is dirty
+    [[ -n "$(git status --porcelain 2>/dev/null)" ]] && echo "*"
+}
+
+# ── Prompt ─────────────────────────────────────────────────────────────────────
+#
+#   (venv) user@host ~/projects/myapp (main*)
+#   ❯
+#
+__setprompt() {
+    local EXIT=$?
+
+    # colours (using \[ \] to avoid line-length bugs)
+    local RST='\[\e[0m\]'
+    local BOLD='\[\e[1m\]'
+    local RED='\[\e[31m\]'
+    local GRN='\[\e[32m\]'
+    local YEL='\[\e[33m\]'
+    local BLU='\[\e[34m\]'
+    local MAG='\[\e[35m\]'
+    local CYN='\[\e[36m\]'
+    local GRY='\[\e[90m\]'
+
+    # virtualenv (pyenv / venv)
+    local venv=""
+    [[ -n "$VIRTUAL_ENV" ]] && venv="${GRY}(${VIRTUAL_ENV##*/}) ${RST}"
+
+    # user — green normally, red for root
+    local user_color=$GRN
+    [[ $EUID -eq 0 ]] && user_color=$RED
+
+    # short host (drop .local etc)
+    local host="${HOSTNAME%%.*}"
+
+    # git info
+    local branch dirty
+    branch=$(__git_branch)
+    dirty=$(__git_dirty)
+
+    # line 1
+    PS1="\n"
+    PS1+="${venv}"
+    PS1+="${user_color}${BOLD}\u${RST}${GRY}@${RST}${BLU}${host}${RST} "
+    PS1+="${YEL}\w${RST}"
+    PS1+="${MAG}${branch}${RED}${dirty}${RST}"
+
+    # error indicator — show exit code in red if last command failed
+    if [[ $EXIT -ne 0 ]]; then
+        PS1+=" ${RED}[✗ $EXIT]${RST}"
+    fi
+
+    # line 2 — prompt character
+    PS1+="\n"
+    if [[ $EUID -eq 0 ]]; then
+        PS1+="${RED}#${RST} "
+    else
+        PS1+="${GRN}\$${RST} "
+    fi
+
+    PS2="${GRY}…${RST} "
+}
+PROMPT_COMMAND="__setprompt; history -a"
+
+# ── Directory navigation ───────────────────────────────────────────────────────
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias bd='cd "$OLDPWD"'
+alias home='cd ~'
+
+mkdirg() { mkdir -p "$1" && cd "$1"; }   # mkdir + cd in one
+up() {                                    # up 3  →  cd ../../..
+    local d
+    for ((i=0; i<${1:-1}; i++)); do d="../$d"; done
+    cd "${d:-.}"
+}
+
+# ── ls ─────────────────────────────────────────────────────────────────────────
+alias ls='ls -Fh --color=always --group-directories-first'
+alias l='ls -lh'
+alias la='ls -lAh'
+alias ll='ls -lh'
+alias lt='ls -ltrh'       # sorted by time
+alias lk='ls -lSrh'       # sorted by size
+alias ldir="ls -lA | grep '^d'"
+alias lf="ls -lA  | grep -v '^d'"
+
+# ── Git shortcuts ──────────────────────────────────────────────────────────────
+alias g='git'
+alias gs='git status -sb'
+alias ga='git add'
+alias gaa='git add -A'
+alias gc='git commit -v'
+alias gcm='git commit -m'
+alias gp='git push'
+alias gpl='git pull --rebase'
+alias glog='git log --oneline --graph --decorate --all'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gco='git checkout'
+alias gcb='git checkout -b'
+alias grb='git rebase'
+alias gst='git stash'
+alias gstp='git stash pop'
+
+# ── Searching ──────────────────────────────────────────────────────────────────
+alias grep='grep --color=auto'
+alias h='history | grep'       # h somecommand
+alias f='find . -name'         # f "*.py"
+ftext() { grep -iIHrn --color=always "$1" . | less -R; }
+
+# ── System helpers ─────────────────────────────────────────────────────────────
+alias cls='clear'
+alias df='df -hT'
+alias du='du -h'
+alias ps='ps auxf'
+alias ports='ss -tulnp'              # replaces netstat
+alias myip='curl -s ifconfig.me'
+alias path='echo -e "${PATH//:/$'"'"'\n'"'"'}"'   # print PATH one entry per line
+
+# Safe defaults
+alias cp='cp -i'
+alias mv='mv -i'
+alias rm='rm -iv'
+alias mkdir='mkdir -p'
+
+# ── Archive helpers ────────────────────────────────────────────────────────────
+extract() {
+    for f in "$@"; do
+        if [[ ! -f "$f" ]]; then echo "'$f' is not a file"; continue; fi
+        case "$f" in
+            *.tar.bz2|*.tbz2) tar xvjf "$f"   ;;
+            *.tar.gz|*.tgz)   tar xvzf "$f"   ;;
+            *.tar.xz)         tar xvJf "$f"   ;;
+            *.tar)            tar xvf  "$f"   ;;
+            *.bz2)            bunzip2  "$f"   ;;
+            *.gz)             gunzip   "$f"   ;;
+            *.zip)            unzip    "$f"   ;;
+            *.7z)             7z x     "$f"   ;;
+            *.rar)            unrar x  "$f"   ;;
+            *)                echo "Don't know how to extract '$f'" ;;
+        esac
+    done
+}
+
+# ── WSL2 services (nginx + redis, same as before) ─────────────────────────────
+_wsl_start_service() {
+    local svc=$1
+    if ! service "$svc" status &>/dev/null; then
+        sudo service "$svc" start
+    fi
+}
+_wsl_start_service nginx
+_wsl_start_service redis-server
+
+# ── pyenv ─────────────────────────────────────────────────────────────────────
+export PYENV_ROOT="$HOME/.pyenv"
+if [[ -d "$PYENV_ROOT" ]]; then
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+    eval "$(pyenv virtualenv-init - 2>/dev/null)"   # optional: auto-activate venvs
+fi
+
+# ── nvm ───────────────────────────────────────────────────────────────────────
+export NVM_DIR="$HOME/.nvm"
+[[ -s "$NVM_DIR/nvm.sh" ]] && . "$NVM_DIR/nvm.sh"
+
+# ── Bun ───────────────────────────────────────────────────────────────────────
+export BUN_INSTALL="$HOME/.bun"
+[[ -d "$BUN_INSTALL" ]] && export PATH="$BUN_INSTALL/bin:$PATH"
+
+# ── Cargo / Rust (kept in case) ───────────────────────────────────────────────
+[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
+
+# ── ssh-agent (start once, reuse across terminals) ────────────────────────────
+# Smarter than always spawning a new agent
+_ssh_agent_env="$HOME/.ssh/agent.env"
+_start_agent() {
+    ssh-agent > "$_ssh_agent_env"
+    chmod 600 "$_ssh_agent_env"
+    . "$_ssh_agent_env" > /dev/null
+    ssh-add ~/.ssh/id_ed25519 2>/dev/null
+}
+if [[ -f "$_ssh_agent_env" ]]; then
+    . "$_ssh_agent_env" > /dev/null
+    # check if that agent pid is actually alive
+    kill -0 "$SSH_AGENT_PID" 2>/dev/null || _start_agent
+else
+    _start_agent
+fi
+unset _ssh_agent_env
+
+# ── local bin ─────────────────────────────────────────────────────────────────
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
+export PATH="$HOME/.local/bin:$PATH"
+
+# >>> grok installer >>>
+export PATH="$HOME/.grok/bin:$PATH"
+[[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
+# <<< grok installer <<<
