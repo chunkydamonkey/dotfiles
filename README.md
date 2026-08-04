@@ -42,10 +42,11 @@ gh auth login    # GitHub login + git credential helper
 |------|--------|
 | 1 | `apt update` + `apt upgrade` |
 | 2 | Install packages from `ubuntu/packages.txt` (curl, git, openssh-client, nvim, tmux, …) |
-| 3 | Install third-party CLIs via official installers (`ubuntu/tools.sh`) |
-| 4 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
-| 5 | Prompt for git name/email → `~/.gitconfig.local` if missing |
-| 6 | Remind if no SSH key is present (does not generate or commit keys) |
+| 3 | Install **WezTerm** via official apt repo (`ubuntu/install-wezterm.sh`; skipped on WSL) |
+| 4 | Install third-party CLIs via official installers (`ubuntu/tools.sh`) |
+| 5 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
+| 6 | Prompt for git name/email → `~/.gitconfig.local` if missing |
+| 7 | Remind if no SSH key is present (does not generate or commit keys) |
 
 You do **not** need to run `install.sh` yourself on a new machine — `setup.sh`
 calls it.
@@ -74,8 +75,9 @@ Already-installed tools are skipped. Auth is always interactive on first run
 
 ```bash
 ./setup.sh --dry-run          # preview only, change nothing
-./setup.sh --packages-only    # apt only (no tools, no config linking)
+./setup.sh --packages-only    # apt packages only (no WezTerm, tools, or linking)
 ./setup.sh --no-tools         # skip herdr/claude/codex/grok installers
+./setup.sh --no-wezterm       # skip WezTerm apt install
 ```
 
 Re-running `./setup.sh` is safe (apt is idempotent; tools skip if present;
@@ -111,9 +113,10 @@ dotfiles/
 ├── install.sh          # Linux/macOS: symlink configs only (called by setup.sh)
 ├── install.ps1         # Windows: junction WezTerm config (no admin)
 ├── ubuntu/
-│   ├── bootstrap.sh    # guts of setup.sh (apt + tools + link + git prompt)
-│   ├── packages.txt    # apt packages always installed on Ubuntu
-│   └── tools.sh        # herdr, Claude Code, Codex, Grok Build installers
+│   ├── bootstrap.sh         # guts of setup.sh (apt + wezterm + tools + link)
+│   ├── packages.txt         # apt packages always installed on Ubuntu
+│   ├── install-wezterm.sh   # official WezTerm apt repo + package
+│   └── tools.sh             # herdr, Claude Code, Codex, Grok Build installers
 ├── shell/
 │   ├── bashrc          # → ~/.bashrc
 │   ├── profile         # → ~/.profile

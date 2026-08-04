@@ -4,9 +4,10 @@
 # Default (no flags) does everything:
 #   1. apt update + upgrade
 #   2. Install packages listed in ubuntu/packages.txt
-#   3. Install third-party CLIs (herdr, Claude Code, Codex, Grok Build)
-#   4. Link dotfiles via ../install.sh
-#   5. Prompt for git identity if ~/.gitconfig.local is missing
+#   3. Install WezTerm (native Linux; skipped on WSL)
+#   4. Install third-party CLIs (herdr, Claude Code, Codex, Grok Build)
+#   5. Link dotfiles via ../install.sh
+#   6. Prompt for git identity if ~/.gitconfig.local is missing
 #
 # Safe: idempotent packages; install.sh backs up real files before linking.
 # Tool installers are vendor curl|bash scripts; auth is never automated.
@@ -15,8 +16,9 @@
 #   ./setup.sh                      # preferred entry point (same as this)
 #   ./ubuntu/bootstrap.sh           # everything
 #   ./ubuntu/bootstrap.sh --dry-run # print plan, change nothing
-#   ./ubuntu/bootstrap.sh --packages-only   # skip config linking
+#   ./ubuntu/bootstrap.sh --packages-only   # skip wezterm, tools, config linking
 #   ./ubuntu/bootstrap.sh --no-tools        # skip herdr/claude/codex/grok
+#   ./ubuntu/bootstrap.sh --no-wezterm      # skip WezTerm apt install
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,19 +26,21 @@ pkg_file="$repo/ubuntu/packages.txt"
 dry_run=0
 do_link=1    # default: do everything
 do_tools=1
+do_wezterm=1
 
 for arg in "$@"; do
   case "$arg" in
     -n|--dry-run)       dry_run=1 ;;
-    --packages-only)    do_link=0; do_tools=0 ;;
+    --packages-only)    do_link=0; do_tools=0; do_wezterm=0 ;;
     --no-tools)         do_tools=0 ;;
+    --no-wezterm)       do_wezterm=0 ;;
     --link)             do_link=1 ;;  # kept for older docs / habits
     -h|--help)
-      sed -n '2,20p' "$0" | sed 's/^# \?//'
+      sed -n '2,22p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *)
-      echo "usage: $0 [--dry-run] [--packages-only] [--no-tools]" >&2
+      echo "usage: $0 [--dry-run] [--packages-only] [--no-tools] [--no-wezterm]" >&2
       exit 2
       ;;
   esac
@@ -119,7 +123,19 @@ elif command -v fdfind >/dev/null 2>&1 && [ ! -e "$HOME/.local/bin/fd" ]; then
   ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
 fi
 
-# ── 3. Third-party tools (official installers) ───────────────────────────────
+# ── 3. WezTerm (official apt repo; native Linux only) ────────────────────────
+if [ "$do_wezterm" -eq 1 ]; then
+  say ""
+  if [ "$dry_run" -eq 1 ]; then
+    "$repo/ubuntu/install-wezterm.sh" --dry-run
+  else
+    set +e
+    "$repo/ubuntu/install-wezterm.sh"
+    set -e
+  fi
+fi
+
+# ── 4. Third-party tools (official installers) ───────────────────────────────
 if [ "$do_tools" -eq 1 ]; then
   say ""
   if [ "$dry_run" -eq 1 ]; then
@@ -132,7 +148,7 @@ if [ "$do_tools" -eq 1 ]; then
   fi
 fi
 
-# ── 4. Link configs (default on) ─────────────────────────────────────────────
+# ── 5. Link configs (default on) ─────────────────────────────────────────────
 if [ "$do_link" -eq 1 ]; then
   say ""
   say "== link dotfiles (install.sh) =="
@@ -143,7 +159,7 @@ if [ "$do_link" -eq 1 ]; then
   fi
 fi
 
-# ── 5. Git identity (once per machine) ───────────────────────────────────────
+# ── 6. Git identity (once per machine) ───────────────────────────────────────
 gitconfig_local="$HOME/.gitconfig.local"
 if [ -f "$gitconfig_local" ]; then
   say ""
@@ -180,7 +196,7 @@ else
   say "skip  no TTY — create $gitconfig_local manually when you can"
 fi
 
-# ── 6. SSH key reminder (never generate/commit keys here) ────────────────────
+# ── 7. SSH key reminder (never generate/commit keys here) ────────────────────
 say ""
 say "== ssh keys =="
 ssh_key=""

@@ -9,11 +9,12 @@
 # This runs ubuntu/bootstrap.sh, which:
 #   1. apt update + upgrade
 #   2. installs packages from ubuntu/packages.txt (curl, git, ssh, nvim, …)
-#   3. installs third-party CLIs (herdr, Claude Code, Codex, Grok Build)
-#   4. links shell / WezTerm configs via install.sh
-#   5. prompts for git name/email if ~/.gitconfig.local is missing
+#   3. installs WezTerm (native Linux; skipped on WSL)
+#   4. installs third-party CLIs (herdr, Claude Code, Codex, Grok Build)
+#   5. links shell / WezTerm configs via install.sh
+#   6. prompts for git name/email if ~/.gitconfig.local is missing
 #
-# Flags are passed through (e.g. ./setup.sh --dry-run, --no-tools).
+# Flags are passed through (e.g. ./setup.sh --dry-run, --no-tools, --no-wezterm).
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
