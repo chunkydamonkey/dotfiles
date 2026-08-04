@@ -40,48 +40,49 @@ export LS_COLORS='di=1;34:ln=1;36:ex=1;32:*.tar=1;31:*.gz=1;31:*.zip=1;31:*.jpg=
 export GREP_COLORS='mt=1;33'
 
 # ── Default tools ──────────────────────────────────────────────────────────────
-export EDITOR=vim
-export VISUAL=vim
+export EDITOR=nvim
+export VISUAL=nvim
 export PAGER=less
 export LESS='-R --quit-if-one-screen --no-init'
 
-# ── WSL2: Windows interop ──────────────────────────────────────────────────────
-# Lets you open Windows Explorer / apps from the terminal
-export BROWSER='/mnt/c/Windows/explorer.exe'
-alias open='explorer.exe'          # open . → opens current folder in Explorer
-alias pbcopy='clip.exe'            # echo "hello" | pbcopy
-alias pbpaste='powershell.exe -command "Get-Clipboard"'
-
-# Open Windows Terminal with a 4-pane dev layout in the current (or given) directory
-#   dev-layout              # uses $PWD
-#   dev-layout ~/projects/foo
-dev-layout() {
-    local DIR WIN_DIR TAB_TITLE
-    if [[ -z "$1" ]]; then
-        DIR="$PWD"
-    else
-        DIR=$(realpath -m "$1")
-    fi
-    WIN_DIR=$(wslpath -w "$DIR")
-    TAB_TITLE=$(basename "$DIR")
-
-    wt.exe -w 0 new-tab -p "Debian" -d "$WIN_DIR" \
-        --title "$TAB_TITLE" --suppressApplicationTitle \
-        \; split-pane -V -p "Debian" -d "$WIN_DIR" \
-        \; split-pane -H -p "Debian" -d "$WIN_DIR" \
-        \; split-pane -V -p "Debian" -d "$WIN_DIR"
-}
-
-# ── Vim clipboard → Windows ────────────────────────────────────────────────────
-# In vim: "+y  to copy to Windows clipboard
-#         "+p  to paste from Windows clipboard
-# This makes the system clipboard ("+) route through clip.exe automatically.
-# No extra packages needed in Windows Terminal.
-if [[ -z "$DISPLAY" ]]; then
-    export DISPLAY=:0   # keeps some vim plugins happy even without X
+# ── WSL2: Windows interop (skipped on native Ubuntu) ───────────────────────────
+_is_wsl=0
+if [[ -r /proc/version ]] && grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
+    _is_wsl=1
 fi
-# Tell vim to use the Windows clipboard when launched from WSL
-# (The actual vim config lives in ~/.vimrc — see note at bottom)
+
+if [[ $_is_wsl -eq 1 ]]; then
+    # Lets you open Windows Explorer / apps from the terminal
+    export BROWSER='/mnt/c/Windows/explorer.exe'
+    alias open='explorer.exe'          # open . → opens current folder in Explorer
+    alias pbcopy='clip.exe'            # echo "hello" | pbcopy
+    alias pbpaste='powershell.exe -command "Get-Clipboard"'
+
+    # Open Windows Terminal with a 4-pane dev layout in the current (or given) directory
+    #   dev-layout              # uses $PWD
+    #   dev-layout ~/projects/foo
+    dev-layout() {
+        local DIR WIN_DIR TAB_TITLE
+        if [[ -z "$1" ]]; then
+            DIR="$PWD"
+        else
+            DIR=$(realpath -m "$1")
+        fi
+        WIN_DIR=$(wslpath -w "$DIR")
+        TAB_TITLE=$(basename "$DIR")
+
+        wt.exe -w 0 new-tab -p "Debian" -d "$WIN_DIR" \
+            --title "$TAB_TITLE" --suppressApplicationTitle \
+            \; split-pane -V -p "Debian" -d "$WIN_DIR" \
+            \; split-pane -H -p "Debian" -d "$WIN_DIR" \
+            \; split-pane -V -p "Debian" -d "$WIN_DIR"
+    }
+
+    # Vim clipboard → Windows: "+y / "+p via clip.exe (no extra Windows packages)
+    if [[ -z "$DISPLAY" ]]; then
+        export DISPLAY=:0   # keeps some vim plugins happy even without X
+    fi
+fi
 
 # ── Git branch helper (used in prompt) ────────────────────────────────────────
 __git_branch() {
@@ -237,15 +238,21 @@ extract() {
     done
 }
 
-# ── WSL2 services (nginx + redis, same as before) ─────────────────────────────
-_wsl_start_service() {
-    local svc=$1
-    if ! service "$svc" status &>/dev/null; then
-        sudo service "$svc" start
-    fi
-}
-_wsl_start_service nginx
-_wsl_start_service redis-server
+# ── WSL2 services (nginx + redis) — only on WSL, never block the shell ────────
+# Opt-in with:  export WSL_AUTO_START_SERVICES=1  (e.g. in ~/.bashrc.local)
+# Uses `sudo -n` so a missing password never hangs a new terminal.
+if [[ ${_is_wsl:-0} -eq 1 && "${WSL_AUTO_START_SERVICES:-0}" == "1" ]]; then
+    _wsl_start_service() {
+        local svc=$1
+        command -v service >/dev/null 2>&1 || return 0
+        # only if the unit looks installed
+        [[ -e "/etc/init.d/$svc" || -e "/lib/systemd/system/${svc}.service" ]] || return 0
+        service "$svc" status &>/dev/null && return 0
+        sudo -n service "$svc" start 2>/dev/null || true
+    }
+    _wsl_start_service nginx
+    _wsl_start_service redis-server
+fi
 
 # ── pyenv ─────────────────────────────────────────────────────────────────────
 export PYENV_ROOT="$HOME/.pyenv"
@@ -267,18 +274,28 @@ export BUN_INSTALL="$HOME/.bun"
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 
 # ── ssh-agent (start once, reuse across terminals) ────────────────────────────
-# Smarter than always spawning a new agent
 _ssh_agent_env="$HOME/.ssh/agent.env"
+_ssh_add_keys() {
+    local key
+    for key in "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ecdsa" "$HOME/.ssh/id_rsa"; do
+        [[ -f "$key" ]] && ssh-add "$key" 2>/dev/null
+    done
+}
 _start_agent() {
+    mkdir -p "$HOME/.ssh"
     ssh-agent > "$_ssh_agent_env"
     chmod 600 "$_ssh_agent_env"
     . "$_ssh_agent_env" > /dev/null
-    ssh-add ~/.ssh/id_ed25519 2>/dev/null
+    _ssh_add_keys
 }
 if [[ -f "$_ssh_agent_env" ]]; then
     . "$_ssh_agent_env" > /dev/null
-    # check if that agent pid is actually alive
-    kill -0 "$SSH_AGENT_PID" 2>/dev/null || _start_agent
+    if ! kill -0 "${SSH_AGENT_PID:-}" 2>/dev/null; then
+        _start_agent
+    else
+        # agent alive — ensure keys are loaded (no-op if already added / none exist)
+        _ssh_add_keys
+    fi
 else
     _start_agent
 fi
@@ -292,3 +309,6 @@ export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.grok/bin:$PATH"
 [[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
 # <<< grok installer <<<
+
+# Optional machine-local overrides (not tracked)
+[[ -f "$HOME/.bashrc.local" ]] && . "$HOME/.bashrc.local"

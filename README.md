@@ -1,101 +1,204 @@
 # dotfiles
 
-Cross-platform dotfiles. Scaffolded from Kun Chen's
-[`dotfiles-mac-nix`](https://github.com/kunchenguid/dotfiles-mac-nix), but
-swapped from Nix (macOS/Linux only) to a plain git repo + bootstrap scripts so
-it works natively on **Windows** and **WSL2** too.
+Cross-platform personal configs (shell, git, WezTerm) plus a **one-command Ubuntu
+setup**. Plain git + bootstrap scripts — works on **Ubuntu**, **WSL2**, and
+**Windows**.
+
+Scaffolded from Kun Chen's
+[`dotfiles-mac-nix`](https://github.com/kunchenguid/dotfiles-mac-nix) / maintained
+[`dotfiles`](https://github.com/kunchenguid/dotfiles) (Neovim), then adapted away
+from Nix so Windows/WSL2 work natively.
+
+---
+
+## Fresh Ubuntu (desktop or WSL2)
+
+You're on a new machine. Open Terminal and run:
+
+```bash
+# 1. Just enough to clone
+sudo apt update && sudo apt install -y git curl
+
+# 2. Clone this repo
+git clone https://github.com/chunkydamonkey/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+
+# 3. One script — does everything
+./setup.sh
+
+# 4. Reload the shell
+exec bash -l
+```
+
+Optional after that:
+
+```bash
+gh auth login    # GitHub login + git credential helper
+```
+
+### What `./setup.sh` does
+
+| Step | Action |
+|------|--------|
+| 1 | `apt update` + `apt upgrade` |
+| 2 | Install packages from `ubuntu/packages.txt` (curl, git, openssh-client, nvim, tmux, …) |
+| 3 | Install third-party CLIs via official installers (`ubuntu/tools.sh`) |
+| 4 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
+| 5 | Prompt for git name/email → `~/.gitconfig.local` if missing |
+| 6 | Remind if no SSH key is present (does not generate or commit keys) |
+
+You do **not** need to run `install.sh` yourself on a new machine — `setup.sh`
+calls it.
+
+### Third-party tools (not apt)
+
+These are installed with each vendor’s official script (same as their docs).
+The repo only records **how** to install them — not API keys or login state.
+
+| Tool | Binary | Installer |
+|------|--------|-----------|
+| [Herdr](https://herdr.dev/) | `herdr` | `curl -fsSL https://herdr.dev/install.sh \| sh` |
+| [Claude Code](https://code.claude.com/) | `claude` | `curl -fsSL https://claude.ai/install.sh \| bash` |
+| [Codex](https://github.com/openai/codex) | `codex` | `curl -fsSL https://chatgpt.com/codex/install.sh \| sh` |
+| [Grok Build](https://x.ai/cli) | `grok` | `curl -fsSL https://x.ai/cli/install.sh \| bash` |
+
+Already-installed tools are skipped. Auth is always interactive on first run
+(`claude`, `codex`, `grok`, …) — keep tokens out of git.
+
+```bash
+./ubuntu/tools.sh             # install / refresh tools only
+./ubuntu/tools.sh --dry-run
+```
+
+### Useful flags
+
+```bash
+./setup.sh --dry-run          # preview only, change nothing
+./setup.sh --packages-only    # apt only (no tools, no config linking)
+./setup.sh --no-tools         # skip herdr/claude/codex/grok installers
+```
+
+Re-running `./setup.sh` is safe (apt is idempotent; tools skip if present;
+configs are backup-first).
+
+---
+
+## Fresh Windows (WezTerm)
+
+```powershell
+# 1. Install tools
+winget install --id Git.Git -e --accept-package-agreements --accept-source-agreements
+winget install --id GitHub.cli -e
+winget install --id wez.wezterm -e
+
+# 2. New terminal, then authenticate
+gh auth login
+
+# 3. Clone + link WezTerm config
+gh repo clone chunkydamonkey/dotfiles "$HOME\dotfiles"
+powershell -ExecutionPolicy Bypass -File "$HOME\dotfiles\install.ps1"
+
+# 4. Launch WezTerm — config + Hack Nerd Font come from the repo
+```
+
+---
 
 ## Layout
 
 ```
 dotfiles/
-├── wezterm/            # WezTerm config (Windows/macOS host terminal)
-│   ├── wezterm.lua     # cross-platform, OS-aware at runtime
-│   └── fonts/          # Hack Nerd Font, bundled (self-contained)
-├── shell/              # Linux / WSL2 shell environment
+├── setup.sh            # ONE script for a new Ubuntu machine
+├── install.sh          # Linux/macOS: symlink configs only (called by setup.sh)
+├── install.ps1         # Windows: junction WezTerm config (no admin)
+├── ubuntu/
+│   ├── bootstrap.sh    # guts of setup.sh (apt + tools + link + git prompt)
+│   ├── packages.txt    # apt packages always installed on Ubuntu
+│   └── tools.sh        # herdr, Claude Code, Codex, Grok Build installers
+├── shell/
 │   ├── bashrc          # → ~/.bashrc
 │   ├── profile         # → ~/.profile
 │   └── gitconfig       # → ~/.gitconfig (identity via ~/.gitconfig.local)
-├── install.ps1         # Windows bootstrap (junction, no admin) — WezTerm
-├── install.sh          # Linux/macOS bootstrap (symlinks) — shell + WezTerm
-└── README.md
+├── nvim/               # → ~/.config/nvim  (from kunchenguid/dotfiles)
+├── tmux/
+│   └── tmux.conf       # → ~/.tmux.conf
+└── wezterm/
+    ├── wezterm.lua     # OS-aware; fonts loaded from this folder
+    └── fonts/          # Hack Nerd Font (bundled)
 ```
 
-`wezterm.lua` detects the OS at runtime and loads fonts from
-`wezterm.config_dir/fonts` — no hardcoded paths. `install.sh` is **backup-first,
-idempotent, and OS-guarded**: any real file in the way is moved to
-`<target>.pre-dotfiles.<timestamp>` before it symlinks (it never deletes real
-data), and re-running is safe. Use `./install.sh --dry-run` to preview.
+### Neovim
 
-## Setup on a fresh machine
+Adapted from [kunchenguid/dotfiles](https://github.com/kunchenguid/dotfiles):
 
-Everything (config + fonts) is in the repo, so a new machine only needs a few
-tools, one auth, a clone, and one script.
+- **lazy.nvim** plugin manager (bootstraps on first `nvim` launch — needs network once)
+- **rose-pine moon** theme
+- **oil.nvim** file browser (`<leader>e`), **snacks** picker (`<leader>f` / `s` / `b`)
+- **neogit** + gitsigns (`<leader>g`)
+- Space is leader; Esc saves; system clipboard; relative numbers
 
-### Fresh Windows machine (WezTerm)
+### tmux
 
-```powershell
-# 1. Install tools (Windows Terminal is preinstalled on Win11)
-winget install --id Git.Git -e --accept-package-agreements --accept-source-agreements
-winget install --id GitHub.cli -e
-winget install --id wez.wezterm -e
+Same link pattern as nvim/wezterm. Small config for long sessions: mouse, large
+history, path-aware splits, vi keys. Prefix stays `C-b` (herdr-friendly).
 
-# 2. Open a NEW terminal (so git/gh land on PATH), then authenticate
-gh auth login                    # GitHub.com → HTTPS → login with browser
+### Safety notes
 
-# 3. Clone the private repo (gh provides auth) + bootstrap
-gh repo clone chunkydamonkey/dotfiles "$HOME\dotfiles"
-powershell -ExecutionPolicy Bypass -File "$HOME\dotfiles\install.ps1"
+- **`install.sh`** never deletes real files. Anything in the way is moved to
+  `*.pre-dotfiles.<timestamp>`, then replaced with a symlink. Re-running is safe.
+- **`~/.gitconfig.local`** holds your name/email and is **not** committed (so the
+  public repo stays free of personal identity).
+- **SSH keys** are never generated or committed; setup only reminds you if none exist.
+- Shell config is WSL-aware: Windows interop only under WSL. Optional WSL service
+  auto-start is **off** unless you set `WSL_AUTO_START_SERVICES=1` (e.g. in
+  `~/.bashrc.local`).
 
-# 4. Launch WezTerm — config + Hack font come from the repo.
+---
+
+## Day to day
+
+| Goal | What to do |
+|------|------------|
+| Pull latest configs | `cd ~/dotfiles && git pull` |
+| Always install a new package on fresh machines | Add it to `ubuntu/packages.txt`, commit, then `./setup.sh` (or `./setup.sh --packages-only`) |
+| Manage a new app config | Add a folder, wire it in `install.sh` (and `install.ps1` if Windows), run `./install.sh` once |
+| Configs only (packages already OK) | `./install.sh` then `exec bash -l` |
+| SSH key for GitHub | `ssh-keygen -t ed25519 -C "you@example.com"` then `gh auth login` or add the `.pub` on GitHub |
+
+After the first setup, **pulling** updates live configs (they are symlinks into the
+repo). Re-run `install.sh` only when you add a **new** managed path.
+
+---
+
+## WSL2 + Windows together
+
+WezTerm runs on the **Windows host**. Under WSL, `install.sh` skips the WezTerm
+link and only manages shell configs.
+
+Keep two clones of the same repo — never put the WSL clone under `/mnt/c`
+(DrvFs symlink/perf issues):
+
+```
+              GitHub: chunkydamonkey/dotfiles
+                 ▲                     ▲
+   C:\Users\…\dotfiles          ~/dotfiles   (Linux FS)
+   install.ps1 → WezTerm        setup.sh / install.sh → shell
 ```
 
-### WSL2 / Linux / macOS (shell environment)
+Edit and push on one side; `git pull` on the other before editing there
+(`pull.rebase=true` is set in the shared gitconfig).
 
-On a fresh Windows box, first run `wsl --install` (installs WSL2 + Ubuntu),
-reboot, and create your Linux user. Then inside the distro:
+---
 
-```bash
-sudo apt update && sudo apt install -y git gh   # gh via apt on recent Ubuntu; else cli.github.com
-gh auth login
-git clone https://github.com/chunkydamonkey/dotfiles.git ~/dotfiles
-cd ~/dotfiles
-./install.sh --dry-run   # preview — shows what it would back up/link
-./install.sh             # apply (backs up any existing files first)
-exec bash -l             # reload the shell
-```
+## Git identity
 
-Finally set your git identity in an untracked `~/.gitconfig.local` (the tracked
-gitconfig `include`s it, so no personal/work email lives in the repo):
+Created by `./setup.sh` when missing, or manually:
 
 ```ini
+# ~/.gitconfig.local  (not tracked)
 [user]
     name  = Your Name
     email = you@example.com
 ```
 
-## WSL2 note & sync model
-
-WezTerm runs on the Windows host, so under WSL `install.sh` **skips** the WezTerm
-link (nothing reads it there) and only manages the shell configs.
-
-There are two working copies of this one repo. Keep the WSL clone on the Linux
-filesystem (`~/dotfiles`), never under `/mnt/c` (DrvFs symlink/perf issues):
-
-```
-        GitHub: chunkydamonkey/dotfiles (origin/main)
-           ▲                                   ▲
-   C:\Users\...\dotfiles  (Windows)     ~/dotfiles  (WSL native FS)
-   drives WezTerm (install.ps1)         drives Linux shell (install.sh)
-```
-
-Edit/commit/push in one; `git pull` in the other before editing there
-(`pull.rebase=true` is the default). After pulling shell-config changes you need
-NOT re-run `install.sh` — the targets are symlinks into the repo, so a pull
-updates them live. Re-run only when adding a NEW managed file.
-
-## Adding more configs later
-
-Drop the app's config under a new top-level folder (e.g. `nvim/`) and add a
-matching pair to the link loop in `install.sh` (and `install.ps1` if it also
-applies on Windows). Same pattern as `shell/` and `wezterm/`.
+The tracked `shell/gitconfig` includes this file; a missing include is ignored
+until you create it.

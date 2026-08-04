@@ -1,0 +1,48 @@
+# Core packages for a fresh Ubuntu (desktop or server).
+# One package per line. Lines starting with # and blank lines are ignored.
+# Maintained for: native Ubuntu + WSL2 Ubuntu.
+
+# Always need on a fresh box
+curl
+git
+openssh-client
+
+# Shell / CLI basics
+bash-completion
+wget
+ca-certificates
+gnupg
+software-properties-common
+build-essential
+pkg-config
+
+# Version control extras
+git-lfs
+gh
+
+# Editors & paging
+vim
+neovim
+less
+
+# Networking / diagnostics
+net-tools
+iproute2
+dnsutils
+# openssh-server   # uncomment if you want to SSH *into* this machine
+
+# Archives (used by bashrc extract helper)
+unzip
+zip
+p7zip-full
+bzip2
+xz-utils
+
+# Quality of life
+htop
+tree
+ripgrep
+fd-find
+jq
+tmux
+fontconfig

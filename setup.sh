@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# One-shot machine setup for Ubuntu.
+#
+# After a fresh install:
+#   sudo apt update && sudo apt install -y git curl
+#   git clone https://github.com/chunkydamonkey/dotfiles.git ~/dotfiles
+#   cd ~/dotfiles && ./setup.sh
+#
+# This runs ubuntu/bootstrap.sh, which:
+#   1. apt update + upgrade
+#   2. installs packages from ubuntu/packages.txt (curl, git, ssh, nvim, …)
+#   3. installs third-party CLIs (herdr, Claude Code, Codex, Grok Build)
+#   4. links shell / WezTerm configs via install.sh
+#   5. prompts for git name/email if ~/.gitconfig.local is missing
+#
+# Flags are passed through (e.g. ./setup.sh --dry-run, --no-tools).
+set -euo pipefail
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$repo/ubuntu/bootstrap.sh" "$@"

@@ -54,10 +54,18 @@ link_one() {
 
 if [ "$os" = "linux" ] || [ "$os" = "macos" ]; then
   say "== shell configs ($os) =="
-  for pair in "shell/bashrc|.bashrc" "shell/profile|.profile" "shell/gitconfig|.gitconfig"; do
+  for pair in \
+    "shell/bashrc|.bashrc" \
+    "shell/profile|.profile" \
+    "shell/gitconfig|.gitconfig" \
+    "tmux/tmux.conf|.tmux.conf"
+  do
     s="${pair%%|*}"; t="${pair#*|}"
     link_one "$repo/$s" "$HOME/$t"
   done
+
+  say "== nvim =="
+  link_one "$repo/nvim" "$HOME/.config/nvim"
 else
   say "== shell configs: skipped (unsupported OS: $(uname -s)) =="
 fi

@@ -3,6 +3,8 @@
 # ignored, so fresh machines don't error until you create it.
 [include]
 	path = ~/.gitconfig.local
+[core]
+	editor = nvim
 [pull]
 	rebase = true
 [push]
