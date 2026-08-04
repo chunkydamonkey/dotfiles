@@ -1,4 +1,6 @@
 local wezterm = require("wezterm")
+local mux = wezterm.mux
+local act = wezterm.action
 
 local config = wezterm.config_builder()
 
@@ -7,6 +9,12 @@ local triple = wezterm.target_triple:lower()
 local is_windows = triple:find("windows") ~= nil
 local is_macos = triple:find("darwin") ~= nil
 local is_linux = triple:find("linux") ~= nil
+
+-- Open maximized (not fullscreen) on first window.
+wezterm.on("gui-startup", function(cmd)
+  local _tab, _pane, window = mux.spawn_window(cmd or {})
+  window:gui_window():maximize()
+end)
 
 -- Load fonts bundled next to this config (repo/wezterm/fonts). No system
 -- install and no hardcoded user paths, so this is portable across machines.
@@ -47,5 +55,24 @@ elseif is_linux then
   config.window_background_opacity = 0.9
   config.window_frame.font_size = 11.0
 end
+
+-- ── Keys ────────────────────────────────────────────────────────────────────
+-- Defaults are Ctrl+Shift+Alt+" (stacked) and Ctrl+Shift+Alt+% (side-by-side).
+-- Same modifiers, easier letters:
+--   Ctrl+Shift+Alt+V  →  vertical divider   (panes left | right)
+--   Ctrl+Shift+Alt+H  →  horizontal divider (panes top / bottom)
+-- No clash with paste (Ctrl+Shift+V), nvim (Ctrl+w), or tmux (Ctrl+b).
+config.keys = {
+  {
+    key = "v",
+    mods = "CTRL|SHIFT|ALT",
+    action = act.SplitHorizontal { domain = "CurrentPaneDomain" },
+  },
+  {
+    key = "h",
+    mods = "CTRL|SHIFT|ALT",
+    action = act.SplitVertical { domain = "CurrentPaneDomain" },
+  },
+}
 
 return config
