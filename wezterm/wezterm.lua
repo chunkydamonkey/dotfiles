@@ -57,21 +57,52 @@ elseif is_linux then
 end
 
 -- ── Keys ────────────────────────────────────────────────────────────────────
--- Defaults are Ctrl+Shift+Alt+" (stacked) and Ctrl+Shift+Alt+% (side-by-side).
--- Same modifiers, easier letters:
---   Ctrl+Shift+Alt+V  →  vertical divider   (panes left | right)
---   Ctrl+Shift+Alt+H  →  horizontal divider (panes top / bottom)
--- No clash with paste (Ctrl+Shift+V), nvim (Ctrl+w), or tmux (Ctrl+b).
+-- Same split shapes as tmux (Ctrl+b | / -), but WezTerm uses Ctrl+Shift+Alt
+-- so it doesn't steal tmux's prefix or WezTerm paste (Ctrl+Shift+V):
+--   Ctrl+Shift+Alt+|  →  left | right   (like tmux prefix+| / %)
+--   Ctrl+Shift+Alt+-  →  top / bottom   (like tmux prefix+- / ")
+-- Note: with Shift held, the physical "-" key is often reported as "_",
+-- so we bind both. (Some layouts may surface "+"; bind that too.)
+--
+-- Quick Select default is Ctrl+Shift+Space — easy to hit by accident while
+-- holding Ctrl+Shift for paste/copy. Move it to Ctrl+Shift+Y; free Space chord.
+local split_vertical = act.SplitVertical { domain = "CurrentPaneDomain" }
+local split_horizontal = act.SplitHorizontal { domain = "CurrentPaneDomain" }
 config.keys = {
+  { key = "|", mods = "CTRL|SHIFT|ALT", action = split_horizontal },
+  { key = "\\", mods = "CTRL|SHIFT|ALT", action = split_horizontal }, -- same key unshifted on US
+  { key = "-", mods = "CTRL|SHIFT|ALT", action = split_vertical },
+  { key = "_", mods = "CTRL|SHIFT|ALT", action = split_vertical },
+  { key = "+", mods = "CTRL|SHIFT|ALT", action = split_vertical },
+
+  -- Paste like a normal desktop app (Ctrl+V). WezTerm handles this before the
+  -- shell/nvim sees it. Tradeoff: nvim won't get Ctrl+V for visual-block mode
+  -- (use Ctrl+Q for block select in nvim, or :help CTRL-V-alternative).
+  -- With Shift held, the key is often "V" not "v" — bind both (same as -/_).
+  { key = "v", mods = "CTRL", action = act.PasteFrom "Clipboard" },
+  { key = "V", mods = "CTRL", action = act.PasteFrom "Clipboard" },
+  { key = "v", mods = "CTRL|SHIFT", action = act.PasteFrom "Clipboard" },
+  { key = "V", mods = "CTRL|SHIFT", action = act.PasteFrom "Clipboard" },
+  { key = "Insert", mods = "SHIFT", action = act.PasteFrom "Clipboard" },
+  -- Copy: keep Ctrl+Shift+C so Ctrl+C still interrupts processes in the shell
+  { key = "c", mods = "CTRL|SHIFT", action = act.CopyTo "Clipboard" },
+  { key = "C", mods = "CTRL|SHIFT", action = act.CopyTo "Clipboard" },
+
+  -- Move Quick Select off Ctrl+Shift+Space (was hijacking paste attempts)
   {
-    key = "v",
-    mods = "CTRL|SHIFT|ALT",
-    action = act.SplitHorizontal { domain = "CurrentPaneDomain" },
+    key = "phys:Space",
+    mods = "CTRL|SHIFT",
+    action = act.DisableDefaultAssignment,
   },
+  { key = "y", mods = "CTRL|SHIFT", action = act.QuickSelect },
+}
+
+-- Right-click paste (handy when keys fight you)
+config.mouse_bindings = {
   {
-    key = "h",
-    mods = "CTRL|SHIFT|ALT",
-    action = act.SplitVertical { domain = "CurrentPaneDomain" },
+    event = { Down = { streak = 1, button = "Right" } },
+    mods = "NONE",
+    action = act.PasteFrom "Clipboard",
   },
 }
 

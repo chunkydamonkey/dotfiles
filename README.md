@@ -46,7 +46,7 @@ gh auth login    # GitHub login + git credential helper
 | 4 | Install third-party CLIs via official installers (`ubuntu/tools.sh`) |
 | 5 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
 | 6 | Prompt for git name/email → `~/.gitconfig.local` if missing |
-| 7 | Remind if no SSH key is present (does not generate or commit keys) |
+| 7 | **SSH key for this machine** — generate `~/.ssh/id_ed25519` if missing; offer `gh auth` + upload pubkey (private key never in git) |
 
 You do **not** need to run `install.sh` yourself on a new machine — `setup.sh`
 calls it.
@@ -62,6 +62,8 @@ The repo only records **how** to install them — not API keys or login state.
 | [Claude Code](https://code.claude.com/) | `claude` | `curl -fsSL https://claude.ai/install.sh \| bash` |
 | [Codex](https://github.com/openai/codex) | `codex` | `curl -fsSL https://chatgpt.com/codex/install.sh \| sh` |
 | [Grok Build](https://x.ai/cli) | `grok` | `curl -fsSL https://x.ai/cli/install.sh \| bash` |
+| [treehouse](https://github.com/kunchenguid/treehouse) | `treehouse` | `curl -fsSL https://kunchenguid.github.io/treehouse/install.sh \| sh` |
+| [firstmate](https://github.com/kunchenguid/firstmate) | clone → `~/firstmate` | `git clone` (agent distro, not a single binary) |
 
 Already-installed tools are skipped. Auth is always interactive on first run
 (`claude`, `codex`, `grok`, …) — keep tokens out of git.
@@ -78,10 +80,26 @@ Already-installed tools are skipped. Auth is always interactive on first run
 ./setup.sh --packages-only    # apt packages only (no WezTerm, tools, or linking)
 ./setup.sh --no-tools         # skip herdr/claude/codex/grok installers
 ./setup.sh --no-wezterm       # skip WezTerm apt install
+./setup.sh --no-ssh-key       # skip SSH key generate / GitHub upload
 ```
 
 Re-running `./setup.sh` is safe (apt is idempotent; tools skip if present;
-configs are backup-first).
+configs are backup-first; existing SSH keys are left alone).
+
+### SSH keys (per machine)
+
+Private keys are **never** in the repo (see `.gitignore`). On a new box, step 7:
+
+1. Creates `~/.ssh/id_ed25519` if you have no default key (empty passphrase)
+2. Comment uses email from `~/.gitconfig.local` when set
+3. If `gh` is logged in, uploads the pubkey (`hostname-YYYYMMDD` title)
+4. If not logged in, offers `gh auth login` then upload
+
+SSH-only re-run:
+
+```bash
+./ubuntu/setup-ssh.sh
+```
 
 ---
 
@@ -116,6 +134,7 @@ dotfiles/
 │   ├── bootstrap.sh         # guts of setup.sh (apt + wezterm + tools + link)
 │   ├── packages.txt         # apt packages always installed on Ubuntu
 │   ├── install-wezterm.sh   # official WezTerm apt repo + package
+│   ├── setup-ssh.sh         # per-machine ed25519 key + optional gh upload
 │   └── tools.sh             # herdr, Claude Code, Codex, Grok Build installers
 ├── shell/
 │   ├── bashrc          # → ~/.bashrc
@@ -150,7 +169,8 @@ history, path-aware splits, vi keys. Prefix stays `C-b` (herdr-friendly).
   `*.pre-dotfiles.<timestamp>`, then replaced with a symlink. Re-running is safe.
 - **`~/.gitconfig.local`** holds your name/email and is **not** committed (so the
   public repo stays free of personal identity).
-- **SSH keys** are never generated or committed; setup only reminds you if none exist.
+- **SSH keys** are generated per machine under `~/.ssh/` and never committed;
+  setup can upload the **public** key via `gh` after you log in.
 - Shell config is WSL-aware: Windows interop only under WSL. Optional WSL service
   auto-start is **off** unless you set `WSL_AUTO_START_SERVICES=1` (e.g. in
   `~/.bashrc.local`).

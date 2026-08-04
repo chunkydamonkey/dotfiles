@@ -8,17 +8,20 @@
 #   4. Install third-party CLIs (herdr, Claude Code, Codex, Grok Build)
 #   5. Link dotfiles via ../install.sh
 #   6. Prompt for git identity if ~/.gitconfig.local is missing
+#   7. SSH key for this machine (generate if missing; optional gh upload)
 #
 # Safe: idempotent packages; install.sh backs up real files before linking.
 # Tool installers are vendor curl|bash scripts; auth is never automated.
+# SSH private keys are never stored in the repo.
 #
 # Usage:
 #   ./setup.sh                      # preferred entry point (same as this)
 #   ./ubuntu/bootstrap.sh           # everything
 #   ./ubuntu/bootstrap.sh --dry-run # print plan, change nothing
-#   ./ubuntu/bootstrap.sh --packages-only   # skip wezterm, tools, config linking
+#   ./ubuntu/bootstrap.sh --packages-only   # skip wezterm, tools, linking, ssh
 #   ./ubuntu/bootstrap.sh --no-tools        # skip herdr/claude/codex/grok
 #   ./ubuntu/bootstrap.sh --no-wezterm      # skip WezTerm apt install
+#   ./ubuntu/bootstrap.sh --no-ssh-key      # skip SSH key generate/upload
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,20 +30,22 @@ dry_run=0
 do_link=1    # default: do everything
 do_tools=1
 do_wezterm=1
+do_ssh=1
 
 for arg in "$@"; do
   case "$arg" in
     -n|--dry-run)       dry_run=1 ;;
-    --packages-only)    do_link=0; do_tools=0; do_wezterm=0 ;;
+    --packages-only)    do_link=0; do_tools=0; do_wezterm=0; do_ssh=0 ;;
     --no-tools)         do_tools=0 ;;
     --no-wezterm)       do_wezterm=0 ;;
+    --no-ssh-key)       do_ssh=0 ;;
     --link)             do_link=1 ;;  # kept for older docs / habits
     -h|--help)
-      sed -n '2,22p' "$0" | sed 's/^# \?//'
+      sed -n '2,24p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *)
-      echo "usage: $0 [--dry-run] [--packages-only] [--no-tools] [--no-wezterm]" >&2
+      echo "usage: $0 [--dry-run] [--packages-only] [--no-tools] [--no-wezterm] [--no-ssh-key]" >&2
       exit 2
       ;;
   esac
@@ -196,26 +201,16 @@ else
   say "skip  no TTY — create $gitconfig_local manually when you can"
 fi
 
-# ── 7. SSH key reminder (never generate/commit keys here) ────────────────────
-say ""
-say "== ssh keys =="
-ssh_key=""
-for cand in "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ecdsa" "$HOME/.ssh/id_rsa"; do
-  if [ -f "$cand" ]; then
-    ssh_key="$cand"
-    break
+# ── 7. SSH key for this machine (never committed) ────────────────────────────
+if [ "$do_ssh" -eq 1 ]; then
+  say ""
+  if [ "$dry_run" -eq 1 ]; then
+    "$repo/ubuntu/setup-ssh.sh" --dry-run
+  else
+    set +e
+    "$repo/ubuntu/setup-ssh.sh"
+    set -e
   fi
-done
-if [ -n "$ssh_key" ]; then
-  say "ok    found $ssh_key"
-elif [ "$dry_run" -eq 1 ]; then
-  say "  DRY-RUN> would remind to create ~/.ssh/id_ed25519 if missing"
-else
-  say "none  no default SSH private key found."
-  say "      Create one when you want GitHub SSH / remote login:"
-  say "        ssh-keygen -t ed25519 -C \"you@example.com\""
-  say "        eval \"\$(ssh-agent -s)\" && ssh-add ~/.ssh/id_ed25519"
-  say "        gh auth login   # or paste ~/.ssh/id_ed25519.pub into GitHub"
 fi
 
 # ── Done ─────────────────────────────────────────────────────────────────────
@@ -232,6 +227,6 @@ else
   say "First nvim launch bootstraps plugins (lazy.nvim) — needs network once."
   say ""
   say "Optional next (interactive — never put tokens in this repo):"
-  say "  gh auth login"
   say "  claude / codex / grok   # each opens its own login on first use"
+  say "  # gh auth: offered during SSH step if not already logged in"
 fi

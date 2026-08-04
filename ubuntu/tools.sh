@@ -38,6 +38,8 @@ tools=(
   "Claude Code|claude|curl -fsSL https://claude.ai/install.sh | bash"
   "Codex|codex|curl -fsSL https://chatgpt.com/codex/install.sh | sh"
   "Grok Build|grok|curl -fsSL https://x.ai/cli/install.sh | bash"
+  # Kun Chen: worktree pool CLI (firstmate uses this for isolated agent checkouts)
+  "treehouse|treehouse|curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh"
 )
 
 # Vendor installers often put binaries in these places; ensure they exist and
@@ -92,6 +94,31 @@ for entry in "${tools[@]}"; do
   fi
 done
 
+# firstmate is a clone-based “agent distro”, not a single binary on PATH.
+fm_dir="${FIRSTMATE_HOME:-$HOME/firstmate}"
+say ""
+say "== firstmate (kunchenguid/firstmate) =="
+if [ -d "$fm_dir/.git" ]; then
+  say "ok    $fm_dir already cloned"
+  if [ "$dry_run" -eq 0 ]; then
+    git -C "$fm_dir" pull --ff-only 2>/dev/null \
+      && say "      pulled latest" \
+      || say "      leave as-is (pull skipped / dirty)"
+  fi
+  skipped=$((skipped + 1))
+elif [ "$dry_run" -eq 1 ]; then
+  say "  DRY-RUN> git clone https://github.com/kunchenguid/firstmate.git $fm_dir"
+else
+  say "clone  https://github.com/kunchenguid/firstmate.git → $fm_dir"
+  if git clone https://github.com/kunchenguid/firstmate.git "$fm_dir"; then
+    say "  done  $fm_dir"
+    installed=$((installed + 1))
+  else
+    say "  FAIL  firstmate clone failed"
+    failed=$((failed + 1))
+  fi
+fi
+
 say ""
 say "tools summary: installed=$installed skipped=$skipped failed=$failed"
 say "Login is per-tool and interactive (not stored in this repo):"
@@ -99,3 +126,5 @@ say "  herdr          # first launch / account as needed"
 say "  claude         # browser auth"
 say "  codex          # ChatGPT / API auth"
 say "  grok           # browser auth (or XAI_API_KEY)"
+say "  treehouse      # worktree pool: cd <repo> && treehouse"
+say "  firstmate      # cd ~/firstmate && claude   # or: grok --trust / pi"

@@ -13,8 +13,9 @@
 #   4. installs third-party CLIs (herdr, Claude Code, Codex, Grok Build)
 #   5. links shell / WezTerm configs via install.sh
 #   6. prompts for git name/email if ~/.gitconfig.local is missing
+#   7. SSH key for this machine (generate if missing; optional gh upload)
 #
-# Flags are passed through (e.g. ./setup.sh --dry-run, --no-tools, --no-wezterm).
+# Flags: ./setup.sh --dry-run --no-tools --no-wezterm --no-ssh-key
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
