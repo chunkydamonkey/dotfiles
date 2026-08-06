@@ -107,6 +107,25 @@ mapfile -t packages < <(
     | grep -v '^$'
 )
 
+# Drop names that are not in any configured apt suite (e.g. Ubuntu-only on Debian).
+# One missing package must not abort the whole install.
+if [ "${#packages[@]}" -gt 0 ] && [ "$dry_run" -eq 0 ]; then
+  available=()
+  missing=()
+  for pkg in "${packages[@]}"; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      available+=("$pkg")
+    else
+      missing+=("$pkg")
+    fi
+  done
+  if [ "${#missing[@]}" -gt 0 ]; then
+    say "warning: not in apt cache (skipped):"
+    printf '  - %s\n' "${missing[@]}"
+  fi
+  packages=("${available[@]}")
+fi
+
 if [ "${#packages[@]}" -eq 0 ]; then
   say "warning: package list is empty — skipping install."
 else

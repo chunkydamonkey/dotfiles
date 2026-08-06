@@ -11,8 +11,14 @@ local is_macos = triple:find("darwin") ~= nil
 local is_linux = triple:find("linux") ~= nil
 
 -- Open maximized (not fullscreen) on first window.
+-- When cmd is nil/empty, spawn_window({}) can land on the local domain (cmd.exe
+-- on Windows) even if default_domain is set — pass the domain explicitly.
 wezterm.on("gui-startup", function(cmd)
-  local _tab, _pane, window = mux.spawn_window(cmd or {})
+  local args = cmd or {}
+  if not args.domain and config.default_domain then
+    args.domain = { DomainName = config.default_domain }
+  end
+  local _tab, _pane, window = mux.spawn_window(args)
   window:gui_window():maximize()
 end)
 
@@ -43,6 +49,55 @@ config.inactive_pane_hsb = {
 
 -- ── Per-OS window translucency / sizing ─────────────────────────────────────
 if is_windows then
+  -- Auto-detect WSL: enumerate installed distros; if any usable one exists,
+  -- make it the default domain. No WSL / only helper distros → leave local
+  -- (cmd/PowerShell). No distro names are hardcoded.
+  local wsl_domains = wezterm.default_wsl_domains()
+  -- Not interactive shells (Docker Desktop, Podman machine, etc.)
+  local skip = {
+    ["docker-desktop"] = true,
+    ["docker-desktop-data"] = true,
+    ["podman-machine-default"] = true,
+  }
+  local function distro_key(d)
+    return (d.distribution or d.name or ""):lower():gsub("^wsl:", "")
+  end
+  local usable = {}
+  for _, d in ipairs(wsl_domains) do
+    if not skip[distro_key(d)] then
+      table.insert(usable, d)
+    end
+  end
+
+  local domain_name = nil
+  if #usable > 0 then
+    -- WSL's own default is the first name from `wsl --list --quiet`
+    -- (UTF-16 on Windows — strip NULs). Fall back to first usable domain.
+    local wsl_default = nil
+    local ok, stdout = wezterm.run_child_process({ "wsl.exe", "--list", "--quiet" })
+    if ok and stdout and #stdout > 0 then
+      local text = stdout:gsub("%z", ""):gsub("\r", "")
+      wsl_default = text:match("([^\n]+)")
+      if wsl_default then
+        wsl_default = wsl_default:match("^%s*(.-)%s*$"):lower()
+        if skip[wsl_default] then
+          wsl_default = nil
+        end
+      end
+    end
+    if wsl_default then
+      for _, d in ipairs(usable) do
+        if distro_key(d) == wsl_default then
+          domain_name = d.name
+          break
+        end
+      end
+    end
+    domain_name = domain_name or usable[1].name
+    config.default_domain = domain_name
+    config.wsl_domains = wsl_domains
+  end
+
   config.win32_system_backdrop = "Acrylic"
   config.window_background_opacity = 0.7
   config.window_frame.font_size = 10.0

@@ -1,6 +1,7 @@
-# Core packages for a fresh Ubuntu (desktop or server).
+# Core packages for a fresh Ubuntu/Debian machine (desktop, server, or WSL2).
 # One package per line. Lines starting with # and blank lines are ignored.
-# Maintained for: native Ubuntu + WSL2 Ubuntu.
+# Maintained for: native Ubuntu/Debian + WSL2.
+# Avoid Ubuntu-only packages (e.g. software-properties-common) — they break Debian.
 
 # Always need on a fresh box
 curl
@@ -12,7 +13,6 @@ bash-completion
 wget
 ca-certificates
 gnupg
-software-properties-common
 build-essential
 pkg-config
 
