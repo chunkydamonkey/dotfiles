@@ -9,6 +9,7 @@
 #   5. Link dotfiles via ../install.sh
 #   6. Prompt for git identity if ~/.gitconfig.local is missing
 #   7. SSH key for this machine (generate if missing; optional gh upload)
+#   8. Clone the pinned private agent-skills repo, link skills, and run its doctor
 #
 # Safe: idempotent packages; install.sh backs up real files before linking.
 # Tool installers are vendor curl|bash scripts; auth is never automated.
@@ -22,6 +23,7 @@
 #   ./ubuntu/bootstrap.sh --no-tools        # skip herdr/claude/codex/grok
 #   ./ubuntu/bootstrap.sh --no-wezterm      # skip WezTerm apt install
 #   ./ubuntu/bootstrap.sh --no-ssh-key      # skip SSH key generate/upload
+#   ./ubuntu/bootstrap.sh --no-skills       # skip personal agent skills
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,21 +33,23 @@ do_link=1    # default: do everything
 do_tools=1
 do_wezterm=1
 do_ssh=1
+do_skills=1
 
 for arg in "$@"; do
   case "$arg" in
     -n|--dry-run)       dry_run=1 ;;
-    --packages-only)    do_link=0; do_tools=0; do_wezterm=0; do_ssh=0 ;;
+    --packages-only)    do_link=0; do_tools=0; do_wezterm=0; do_ssh=0; do_skills=0 ;;
     --no-tools)         do_tools=0 ;;
     --no-wezterm)       do_wezterm=0 ;;
     --no-ssh-key)       do_ssh=0 ;;
+    --no-skills)        do_skills=0 ;;
     --link)             do_link=1 ;;  # kept for older docs / habits
     -h|--help)
-      sed -n '2,24p' "$0" | sed 's/^# \?//'
+      sed -n '2,26p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *)
-      echo "usage: $0 [--dry-run] [--packages-only] [--no-tools] [--no-wezterm] [--no-ssh-key]" >&2
+      echo "usage: $0 [--dry-run] [--packages-only] [--no-tools] [--no-wezterm] [--no-ssh-key] [--no-skills]" >&2
       exit 2
       ;;
   esac
@@ -229,6 +233,16 @@ if [ "$do_ssh" -eq 1 ]; then
     set +e
     "$repo/ubuntu/setup-ssh.sh"
     set -e
+  fi
+fi
+
+# ── 8. Personal agent skills (private, pinned, cross-harness) ────────────────
+if [ "$do_skills" -eq 1 ]; then
+  say ""
+  if [ "$dry_run" -eq 1 ]; then
+    "$repo/ubuntu/install-agent-skills.sh" --dry-run
+  else
+    "$repo/ubuntu/install-agent-skills.sh"
   fi
 fi
 

@@ -14,8 +14,9 @@
 #   5. links shell / WezTerm configs via install.sh
 #   6. prompts for git name/email if ~/.gitconfig.local is missing
 #   7. SSH key for this machine (generate if missing; optional gh upload)
+#   8. clones and links the pinned private agent-skills repository
 #
-# Flags: ./setup.sh --dry-run --no-tools --no-wezterm --no-ssh-key
+# Flags: ./setup.sh --dry-run --no-tools --no-wezterm --no-ssh-key --no-skills
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

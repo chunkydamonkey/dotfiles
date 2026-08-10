@@ -47,6 +47,7 @@ gh auth login    # GitHub login + git credential helper
 | 5 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
 | 6 | Prompt for git name/email → `~/.gitconfig.local` if missing |
 | 7 | **SSH key for this machine** — generate `~/.ssh/id_ed25519` if missing; offer `gh auth` + upload pubkey (private key never in git) |
+| 8 | Clone the private, pinned **agent-skills** repository; link its skills into each harness discovery root; run its doctor |
 
 You do **not** need to run `install.sh` yourself on a new machine — `setup.sh`
 calls it.
@@ -81,10 +82,27 @@ Already-installed tools are skipped. Auth is always interactive on first run
 ./setup.sh --no-tools         # skip herdr/claude/codex/grok installers
 ./setup.sh --no-wezterm       # skip WezTerm apt install
 ./setup.sh --no-ssh-key       # skip SSH key generate / GitHub upload
+./setup.sh --no-skills        # skip the private personal skills repository
 ```
 
 Re-running `./setup.sh` is safe (apt is idempotent; tools skip if present;
 configs are backup-first; existing SSH keys are left alone).
+
+### Personal agent skills
+
+`agent-skills.lock` pins the tested commit of the private
+`chunkydamonkey/agent-skills` repository. The final setup step clones it to
+`~/agent-skills`, links each canonical skill into the discovery roots declared by that
+repository, and runs its doctor. GitHub SSH access must work first; use `--no-skills` when
+bootstrapping before authentication.
+
+The installer refuses an unexpected remote or a dirty `~/agent-skills` checkout. It will
+not overwrite local skill work to satisfy the lock. To preview or repair only this layer:
+
+```bash
+./ubuntu/install-agent-skills.sh --dry-run
+./ubuntu/install-agent-skills.sh
+```
 
 ### SSH keys (per machine)
 
@@ -130,11 +148,13 @@ dotfiles/
 ├── setup.sh            # ONE script for a new Ubuntu machine
 ├── install.sh          # Linux/macOS: symlink configs only (called by setup.sh)
 ├── install.ps1         # Windows: junction WezTerm config (no admin)
+├── agent-skills.lock   # private skill-repo URL + tested full commit
 ├── ubuntu/
 │   ├── bootstrap.sh         # guts of setup.sh (apt + wezterm + tools + link)
 │   ├── packages.txt         # apt packages always installed on Ubuntu
 │   ├── install-wezterm.sh   # official WezTerm apt repo + package
 │   ├── setup-ssh.sh         # per-machine ed25519 key + optional gh upload
+│   ├── install-agent-skills.sh # clone pinned private skill registry + link/doctor
 │   └── tools.sh             # herdr, Claude Code, Codex, Grok Build installers
 ├── shell/
 │   ├── bashrc          # → ~/.bashrc
@@ -184,6 +204,7 @@ history, path-aware splits, vi keys. Prefix stays `C-b` (herdr-friendly).
 | Pull latest configs | `cd ~/dotfiles && git pull` |
 | Always install a new package on fresh machines | Add it to `ubuntu/packages.txt`, commit, then `./setup.sh` (or `./setup.sh --packages-only`) |
 | Manage a new app config | Add a folder, wire it in `install.sh` (and `install.ps1` if Windows), run `./install.sh` once |
+| Install/repair personal agent skills | `./ubuntu/install-agent-skills.sh` |
 | Configs only (packages already OK) | `./install.sh` then `exec bash -l` |
 | SSH key for GitHub | `ssh-keygen -t ed25519 -C "you@example.com"` then `gh auth login` or add the `.pub` on GitHub |
 
