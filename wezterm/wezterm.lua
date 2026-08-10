@@ -275,13 +275,13 @@ config.keys = {
 -- logical "NumpadN" binding).
 for i = 1, 9 do
   table.insert(config.keys, {
-    key = "phys:Numpad" .. i,
+    key = "phys:Keypad" .. i,
     mods = "CTRL|SHIFT",
     action = act.ActivateTab(i - 1),
   })
 end
 table.insert(config.keys, {
-  key = "phys:Numpad0",
+  key = "phys:Keypad0",
   mods = "CTRL|SHIFT",
   action = act.ActivateTab(9),
 })
