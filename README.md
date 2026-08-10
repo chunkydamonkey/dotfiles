@@ -46,6 +46,7 @@ gh auth login    # GitHub login + git credential helper
 | 4 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
 | 5 | Prompt for git name/email → `~/.gitconfig.local` if missing |
 | 6 | **SSH key for this machine** — generate if missing; offer `gh` upload |
+| 7 | Clone the private, pinned **agent-skills** repository; link its skills into each harness discovery root; run its doctor |
 
 You do **not** need to run `install.sh` yourself on a new machine — `setup.sh`
 calls it.
@@ -81,13 +82,30 @@ Auth stays interactive later (`claude`, `gh auth login`, …) — no tokens in g
 ./setup.sh --no-optional      # core + link + git/ssh only
 ./setup.sh --packages-only    # core apt only
 ./setup.sh --no-ssh-key       # skip SSH key step
+./setup.sh --no-skills        # skip the private personal skills repository
 ```
 
 Re-running is safe (apt idempotent; optionals skip installed; configs backup-first).
 
+### Personal agent skills
+
+`agent-skills.lock` pins the tested commit of the private
+`chunkydamonkey/agent-skills` repository. The final setup step clones it to
+`~/agent-skills`, links each canonical skill into the discovery roots declared by that
+repository, and runs its doctor. GitHub SSH access must work first; use `--no-skills` when
+bootstrapping before authentication.
+
+The installer refuses an unexpected remote or a dirty `~/agent-skills` checkout. It will
+not overwrite local skill work to satisfy the lock. To preview or repair only this layer:
+
+```bash
+./ubuntu/install-agent-skills.sh --dry-run
+./ubuntu/install-agent-skills.sh
+```
+
 ### SSH keys (per machine)
 
-Private keys are **never** in the repo (see `.gitignore`). On a new box, step 7:
+Private keys are **never** in the repo (see `.gitignore`). On a new box, step 6:
 
 1. Creates `~/.ssh/id_ed25519` if you have no default key (empty passphrase)
 2. Comment uses email from `~/.gitconfig.local` when set
@@ -129,12 +147,14 @@ dotfiles/
 ├── setup.sh            # ONE script for a new Ubuntu machine
 ├── install.sh          # Linux/macOS: symlink configs only (called by setup.sh)
 ├── install.ps1         # Windows: junction WezTerm config (no admin)
+├── agent-skills.lock   # private skill-repo URL + tested full commit
 ├── ubuntu/
 │   ├── bootstrap.sh         # guts of setup.sh
 │   ├── packages.txt         # core apt packages (always)
 │   ├── optional.sh          # interactive Docker / WezTerm / AI CLIs / …
 │   ├── install-wezterm.sh   # WezTerm apt repo helper
 │   ├── setup-ssh.sh         # per-machine ed25519 key + optional gh upload
+│   ├── install-agent-skills.sh # clone pinned private skill registry + link/doctor
 │   └── tools.sh             # non-interactive bulk vendor CLI helper
 ├── shell/
 │   ├── bashrc          # → ~/.bashrc
@@ -184,6 +204,7 @@ history, path-aware splits, vi keys. Prefix stays `C-b` (herdr-friendly).
 | Pull latest configs | `cd ~/dotfiles && git pull` |
 | Always install a new package on fresh machines | Add it to `ubuntu/packages.txt`, commit, then `./setup.sh` (or `./setup.sh --packages-only`) |
 | Manage a new app config | Add a folder, wire it in `install.sh` (and `install.ps1` if Windows), run `./install.sh` once |
+| Install/repair personal agent skills | `./ubuntu/install-agent-skills.sh` |
 | Configs only (packages already OK) | `./install.sh` then `exec bash -l` |
 | SSH key for GitHub | `ssh-keygen -t ed25519 -C "you@example.com"` then `gh auth login` or add the `.pub` on GitHub |
 

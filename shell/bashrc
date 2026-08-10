@@ -170,6 +170,7 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
 alias bd='cd "$OLDPWD"'
+alias h='cd ~'
 alias home='cd ~'
 
 mkdirg() { mkdir -p "$1" && cd "$1"; }   # mkdir + cd in one
@@ -283,12 +284,11 @@ export BUN_INSTALL="$HOME/.bun"
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 
 # ── ssh-agent (start once, reuse across terminals) ────────────────────────────
+# ed25519 only — do not auto-load RSA/ECDSA keys.
 _ssh_agent_env="$HOME/.ssh/agent.env"
 _ssh_add_keys() {
-    local key
-    for key in "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ecdsa" "$HOME/.ssh/id_rsa"; do
-        [[ -f "$key" ]] && ssh-add "$key" 2>/dev/null
-    done
+    local key="$HOME/.ssh/id_ed25519"
+    [[ -f "$key" ]] && ssh-add "$key" 2>/dev/null
 }
 _start_agent() {
     mkdir -p "$HOME/.ssh"

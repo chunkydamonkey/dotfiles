@@ -13,6 +13,7 @@
 #   4. link configs via install.sh
 #   5. git identity if ~/.gitconfig.local is missing
 #   6. SSH key for this machine (generate if missing; optional gh upload)
+#   7. clones and links the pinned private agent-skills repository
 #
 # Flags:
 #   ./setup.sh --dry-run
@@ -20,6 +21,7 @@
 #   ./setup.sh --no-optional      # core + link + git/ssh only
 #   ./setup.sh --packages-only
 #   ./setup.sh --no-ssh-key
+#   ./setup.sh --no-skills        # skip the private personal skills repository
 # Re-prompt optionals later:  ./ubuntu/optional.sh
 set -euo pipefail
 

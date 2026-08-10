@@ -8,6 +8,7 @@
 #   4. Link configs via ../install.sh
 #   5. Git identity if ~/.gitconfig.local is missing
 #   6. SSH key for this machine (generate if missing; optional gh upload)
+#   7. Clone the pinned private agent-skills repo, link skills, and run its doctor
 #
 # Safe: idempotent packages; install.sh backs up real files before linking.
 # Optional installs never force; missing + no TTY → skip (use --yes to auto-accept
@@ -20,6 +21,7 @@
 #   ./ubuntu/bootstrap.sh --no-optional
 #   ./ubuntu/bootstrap.sh --packages-only
 #   ./ubuntu/bootstrap.sh --no-ssh-key
+#   ./ubuntu/bootstrap.sh --no-skills  # skip personal agent skills
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,6 +30,7 @@ dry_run=0
 do_link=1
 do_optional=1
 do_ssh=1
+do_skills=1
 optional_args=()
 
 for arg in "$@"; do
@@ -47,15 +50,17 @@ for arg in "$@"; do
       do_link=0
       do_optional=0
       do_ssh=0
+      do_skills=0
       ;;
     --no-ssh-key) do_ssh=0 ;;
+    --no-skills)  do_skills=0 ;;
     --link)       do_link=1 ;;
     -h|--help)
       sed -n '2,24p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *)
-      echo "usage: $0 [--dry-run] [--yes] [--no-optional] [--packages-only] [--no-ssh-key]" >&2
+      echo "usage: $0 [--dry-run] [--yes] [--no-optional] [--packages-only] [--no-ssh-key] [--no-skills]" >&2
       exit 2
       ;;
   esac
@@ -127,6 +132,25 @@ mapfile -t packages < <(
   sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$pkg_file" \
     | grep -v '^$'
 )
+
+# Drop names that are not in any configured apt suite (e.g. Ubuntu-only on Debian).
+# One missing package must not abort the whole install.
+if [ "${#packages[@]}" -gt 0 ] && [ "$dry_run" -eq 0 ]; then
+  available=()
+  missing=()
+  for pkg in "${packages[@]}"; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      available+=("$pkg")
+    else
+      missing+=("$pkg")
+    fi
+  done
+  if [ "${#missing[@]}" -gt 0 ]; then
+    say "warning: not in apt cache (skipped):"
+    printf '  - %s\n' "${missing[@]}"
+  fi
+  packages=("${available[@]}")
+fi
 
 if [ "${#packages[@]}" -eq 0 ]; then
   say "warning: package list is empty — skipping install."
@@ -214,6 +238,16 @@ if [ "$do_ssh" -eq 1 ]; then
     set +e
     "$repo/ubuntu/setup-ssh.sh"
     set -e
+  fi
+fi
+
+# ── 7. Personal agent skills (private, pinned, cross-harness) ────────────────
+if [ "$do_skills" -eq 1 ]; then
+  say ""
+  if [ "$dry_run" -eq 1 ]; then
+    "$repo/ubuntu/install-agent-skills.sh" --dry-run
+  else
+    "$repo/ubuntu/install-agent-skills.sh"
   fi
 fi
 
