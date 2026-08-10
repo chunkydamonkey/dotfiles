@@ -170,7 +170,7 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../..'
 alias bd='cd "$OLDPWD"'
-alias h='cd ~'
+alias cdh='cd ~'
 alias home='cd ~'
 
 mkdirg() { mkdir -p "$1" && cd "$1"; }   # mkdir + cd in one
