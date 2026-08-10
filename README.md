@@ -41,50 +41,49 @@ gh auth login    # GitHub login + git credential helper
 | Step | Action |
 |------|--------|
 | 1 | `apt update` + `apt upgrade` |
-| 2 | Install packages from `ubuntu/packages.txt` (curl, git, openssh-client, nvim, tmux, …) |
-| 3 | Install **WezTerm** via official apt repo (`ubuntu/install-wezterm.sh`; skipped on WSL) |
-| 4 | Install third-party CLIs via official installers (`ubuntu/tools.sh`) |
-| 5 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
-| 6 | Prompt for git name/email → `~/.gitconfig.local` if missing |
-| 7 | **SSH key for this machine** — generate `~/.ssh/id_ed25519` if missing; offer `gh auth` + upload pubkey (private key never in git) |
+| 2 | **Core** packages from `ubuntu/packages.txt` (always) |
+| 3 | **Optional** tools — interactive Y/n if missing (`ubuntu/optional.sh`) |
+| 4 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
+| 5 | Prompt for git name/email → `~/.gitconfig.local` if missing |
+| 6 | **SSH key for this machine** — generate if missing; offer `gh` upload |
 
 You do **not** need to run `install.sh` yourself on a new machine — `setup.sh`
 calls it.
 
-### Third-party tools (not apt)
+### Core vs optional
 
-These are installed with each vendor’s official script (same as their docs).
-The repo only records **how** to install them — not API keys or login state.
+**Core** (no questions): git, curl, ssh client, build tools, nvim, tmux, rg, gh, …
 
-| Tool | Binary | Installer |
-|------|--------|-----------|
-| [Herdr](https://herdr.dev/) | `herdr` | `curl -fsSL https://herdr.dev/install.sh \| sh` |
-| [Claude Code](https://code.claude.com/) | `claude` | `curl -fsSL https://claude.ai/install.sh \| bash` |
-| [Codex](https://github.com/openai/codex) | `codex` | `curl -fsSL https://chatgpt.com/codex/install.sh \| sh` |
-| [Grok Build](https://x.ai/cli) | `grok` | `curl -fsSL https://x.ai/cli/install.sh \| bash` |
-| [treehouse](https://github.com/kunchenguid/treehouse) | `treehouse` | `curl -fsSL https://kunchenguid.github.io/treehouse/install.sh \| sh` |
-| [firstmate](https://github.com/kunchenguid/firstmate) | clone → `~/firstmate` | `git clone` (agent distro, not a single binary) |
+**Optional** (asks if not installed; skips if already present):
 
-Already-installed tools are skipped. Auth is always interactive on first run
-(`claude`, `codex`, `grok`, …) — keep tokens out of git.
+| Optional | Default prompt | Notes |
+|----------|----------------|--------|
+| Docker (`docker.io`) | **Y** | enable on boot + add user to `docker` group |
+| wl-clipboard | **Y** | Wayland `pbcopy` / `pbpaste` |
+| WezTerm | **Y** | skipped on WSL |
+| herdr, Claude Code, Codex, Grok, treehouse | **Y** | official curl installers |
+| firstmate | **Y** | clones `~/firstmate` |
+
+Already installed → printed as `ok` and not re-asked.  
+Auth stays interactive later (`claude`, `gh auth login`, …) — no tokens in git.
 
 ```bash
-./ubuntu/tools.sh             # install / refresh tools only
-./ubuntu/tools.sh --dry-run
+./ubuntu/optional.sh            # re-run prompts anytime
+./ubuntu/optional.sh --yes      # install all recommended defaults
+./ubuntu/tools.sh               # non-interactive bulk vendor CLIs (legacy/helper)
 ```
 
 ### Useful flags
 
 ```bash
-./setup.sh --dry-run          # preview only, change nothing
-./setup.sh --packages-only    # apt packages only (no WezTerm, tools, or linking)
-./setup.sh --no-tools         # skip herdr/claude/codex/grok installers
-./setup.sh --no-wezterm       # skip WezTerm apt install
-./setup.sh --no-ssh-key       # skip SSH key generate / GitHub upload
+./setup.sh --dry-run          # preview only
+./setup.sh --yes              # auto-accept recommended optionals (no Y/n)
+./setup.sh --no-optional      # core + link + git/ssh only
+./setup.sh --packages-only    # core apt only
+./setup.sh --no-ssh-key       # skip SSH key step
 ```
 
-Re-running `./setup.sh` is safe (apt is idempotent; tools skip if present;
-configs are backup-first; existing SSH keys are left alone).
+Re-running is safe (apt idempotent; optionals skip installed; configs backup-first).
 
 ### SSH keys (per machine)
 
@@ -131,11 +130,12 @@ dotfiles/
 ├── install.sh          # Linux/macOS: symlink configs only (called by setup.sh)
 ├── install.ps1         # Windows: junction WezTerm config (no admin)
 ├── ubuntu/
-│   ├── bootstrap.sh         # guts of setup.sh (apt + wezterm + tools + link)
-│   ├── packages.txt         # apt packages always installed on Ubuntu
-│   ├── install-wezterm.sh   # official WezTerm apt repo + package
+│   ├── bootstrap.sh         # guts of setup.sh
+│   ├── packages.txt         # core apt packages (always)
+│   ├── optional.sh          # interactive Docker / WezTerm / AI CLIs / …
+│   ├── install-wezterm.sh   # WezTerm apt repo helper
 │   ├── setup-ssh.sh         # per-machine ed25519 key + optional gh upload
-│   └── tools.sh             # herdr, Claude Code, Codex, Grok Build installers
+│   └── tools.sh             # non-interactive bulk vendor CLI helper
 ├── shell/
 │   ├── bashrc          # → ~/.bashrc
 │   ├── profile         # → ~/.profile

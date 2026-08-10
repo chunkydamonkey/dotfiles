@@ -8,14 +8,19 @@
 #
 # This runs ubuntu/bootstrap.sh, which:
 #   1. apt update + upgrade
-#   2. installs packages from ubuntu/packages.txt (curl, git, ssh, nvim, …)
-#   3. installs WezTerm (native Linux; skipped on WSL)
-#   4. installs third-party CLIs (herdr, Claude Code, Codex, Grok Build)
-#   5. links shell / WezTerm configs via install.sh
-#   6. prompts for git name/email if ~/.gitconfig.local is missing
-#   7. SSH key for this machine (generate if missing; optional gh upload)
+#   2. core packages from ubuntu/packages.txt (always)
+#   3. optional tools — interactive Y/n (Docker, WezTerm, AI CLIs, …)
+#   4. link configs via install.sh
+#   5. git identity if ~/.gitconfig.local is missing
+#   6. SSH key for this machine (generate if missing; optional gh upload)
 #
-# Flags: ./setup.sh --dry-run --no-tools --no-wezterm --no-ssh-key
+# Flags:
+#   ./setup.sh --dry-run
+#   ./setup.sh --yes              # auto-accept recommended optionals
+#   ./setup.sh --no-optional      # core + link + git/ssh only
+#   ./setup.sh --packages-only
+#   ./setup.sh --no-ssh-key
+# Re-prompt optionals later:  ./ubuntu/optional.sh
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

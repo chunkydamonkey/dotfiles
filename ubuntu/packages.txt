@@ -1,6 +1,6 @@
-# Core packages for a fresh Ubuntu (desktop or server).
+# Core packages for a fresh Ubuntu (desktop or server) — always installed by setup.
+# Optional apps (Docker, WezTerm, AI CLIs, …) are prompted in ubuntu/optional.sh.
 # One package per line. Lines starting with # and blank lines are ignored.
-# Maintained for: native Ubuntu + WSL2 Ubuntu.
 
 # Always need on a fresh box
 curl
@@ -46,3 +46,4 @@ fd-find
 jq
 tmux
 fontconfig
+# wl-clipboard — optional (prompted in optional.sh; Wayland pbcopy/pbpaste)

@@ -1,55 +1,76 @@
 #!/usr/bin/env bash
 # Ubuntu bootstrap — full post-install setup for a fresh machine.
 #
-# Default (no flags) does everything:
+# Flow:
 #   1. apt update + upgrade
-#   2. Install packages listed in ubuntu/packages.txt
-#   3. Install WezTerm (native Linux; skipped on WSL)
-#   4. Install third-party CLIs (herdr, Claude Code, Codex, Grok Build)
-#   5. Link dotfiles via ../install.sh
-#   6. Prompt for git identity if ~/.gitconfig.local is missing
-#   7. SSH key for this machine (generate if missing; optional gh upload)
+#   2. Core packages from ubuntu/packages.txt (always)
+#   3. Optional tools — interactive prompts (Docker, WezTerm, AI CLIs, …)
+#   4. Link configs via ../install.sh
+#   5. Git identity if ~/.gitconfig.local is missing
+#   6. SSH key for this machine (generate if missing; optional gh upload)
 #
 # Safe: idempotent packages; install.sh backs up real files before linking.
-# Tool installers are vendor curl|bash scripts; auth is never automated.
-# SSH private keys are never stored in the repo.
+# Optional installs never force; missing + no TTY → skip (use --yes to auto-accept
+# recommended defaults). SSH private keys are never stored in the repo.
 #
 # Usage:
-#   ./setup.sh                      # preferred entry point (same as this)
-#   ./ubuntu/bootstrap.sh           # everything
-#   ./ubuntu/bootstrap.sh --dry-run # print plan, change nothing
-#   ./ubuntu/bootstrap.sh --packages-only   # skip wezterm, tools, linking, ssh
-#   ./ubuntu/bootstrap.sh --no-tools        # skip herdr/claude/codex/grok
-#   ./ubuntu/bootstrap.sh --no-wezterm      # skip WezTerm apt install
-#   ./ubuntu/bootstrap.sh --no-ssh-key      # skip SSH key generate/upload
+#   ./setup.sh                         # preferred entry point
+#   ./ubuntu/bootstrap.sh --dry-run
+#   ./ubuntu/bootstrap.sh --yes        # auto-yes recommended optionals
+#   ./ubuntu/bootstrap.sh --no-optional
+#   ./ubuntu/bootstrap.sh --packages-only
+#   ./ubuntu/bootstrap.sh --no-ssh-key
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pkg_file="$repo/ubuntu/packages.txt"
 dry_run=0
-do_link=1    # default: do everything
-do_tools=1
-do_wezterm=1
+do_link=1
+do_optional=1
 do_ssh=1
+optional_args=()
 
 for arg in "$@"; do
   case "$arg" in
-    -n|--dry-run)       dry_run=1 ;;
-    --packages-only)    do_link=0; do_tools=0; do_wezterm=0; do_ssh=0 ;;
-    --no-tools)         do_tools=0 ;;
-    --no-wezterm)       do_wezterm=0 ;;
-    --no-ssh-key)       do_ssh=0 ;;
-    --link)             do_link=1 ;;  # kept for older docs / habits
+    -n|--dry-run)
+      dry_run=1
+      optional_args+=(--dry-run)
+      ;;
+    -y|--yes)
+      optional_args+=(--yes)
+      ;;
+    --no-optional|--no-tools|--no-wezterm)
+      # --no-tools / --no-wezterm kept as aliases for older muscle memory
+      do_optional=0
+      ;;
+    --packages-only)
+      do_link=0
+      do_optional=0
+      do_ssh=0
+      ;;
+    --no-ssh-key) do_ssh=0 ;;
+    --link)       do_link=1 ;;
     -h|--help)
       sed -n '2,24p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *)
-      echo "usage: $0 [--dry-run] [--packages-only] [--no-tools] [--no-wezterm] [--no-ssh-key]" >&2
+      echo "usage: $0 [--dry-run] [--yes] [--no-optional] [--packages-only] [--no-ssh-key]" >&2
       exit 2
       ;;
   esac
 done
+
+# Non-interactive (no TTY): don't block on prompts unless --yes was passed
+if [ "$do_optional" -eq 1 ] && [ ! -t 0 ] && [ "${SETUP_ASSUME_YES:-0}" != "1" ]; then
+  has_yes=0
+  for a in "${optional_args[@]+"${optional_args[@]}"}"; do
+    [ "$a" = "--yes" ] && has_yes=1
+  done
+  if [ "$has_yes" -eq 0 ]; then
+    optional_args+=(--no-prompt)
+  fi
+fi
 
 say() { printf '%s\n' "$*"; }
 run() {
@@ -94,9 +115,9 @@ say ""
 say "== apt upgrade =="
 run "sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y"
 
-# ── 2. Packages from packages.txt ────────────────────────────────────────────
+# ── 2. Core packages ─────────────────────────────────────────────────────────
 say ""
-say "== install packages ($pkg_file) =="
+say "== core packages ($pkg_file) =="
 if [ ! -f "$pkg_file" ]; then
   say "error: package list missing: $pkg_file"
   exit 1
@@ -116,7 +137,6 @@ else
   run "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages[*]}"
 fi
 
-# fd-find installs as `fdfind` on Debian/Ubuntu; offer a user-local `fd` name
 if [ "$dry_run" -eq 1 ]; then
   say ""
   say "== symlink fdfind -> ~/.local/bin/fd (if needed) =="
@@ -128,32 +148,16 @@ elif command -v fdfind >/dev/null 2>&1 && [ ! -e "$HOME/.local/bin/fd" ]; then
   ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
 fi
 
-# ── 3. WezTerm (official apt repo; native Linux only) ────────────────────────
-if [ "$do_wezterm" -eq 1 ]; then
+# ── 3. Optional tools (interactive) ──────────────────────────────────────────
+if [ "$do_optional" -eq 1 ]; then
   say ""
-  if [ "$dry_run" -eq 1 ]; then
-    "$repo/ubuntu/install-wezterm.sh" --dry-run
-  else
-    set +e
-    "$repo/ubuntu/install-wezterm.sh"
-    set -e
-  fi
+  set +e
+  # shellcheck disable=SC2086
+  "$repo/ubuntu/optional.sh" ${optional_args[@]+"${optional_args[@]}"}
+  set -e
 fi
 
-# ── 4. Third-party tools (official installers) ───────────────────────────────
-if [ "$do_tools" -eq 1 ]; then
-  say ""
-  if [ "$dry_run" -eq 1 ]; then
-    "$repo/ubuntu/tools.sh" --dry-run
-  else
-    # Don't abort the whole bootstrap if one vendor script fails.
-    set +e
-    "$repo/ubuntu/tools.sh"
-    set -e
-  fi
-fi
-
-# ── 5. Link configs (default on) ─────────────────────────────────────────────
+# ── 4. Link configs ──────────────────────────────────────────────────────────
 if [ "$do_link" -eq 1 ]; then
   say ""
   say "== link dotfiles (install.sh) =="
@@ -164,7 +168,7 @@ if [ "$do_link" -eq 1 ]; then
   fi
 fi
 
-# ── 6. Git identity (once per machine) ───────────────────────────────────────
+# ── 5. Git identity ──────────────────────────────────────────────────────────
 gitconfig_local="$HOME/.gitconfig.local"
 if [ -f "$gitconfig_local" ]; then
   say ""
@@ -201,7 +205,7 @@ else
   say "skip  no TTY — create $gitconfig_local manually when you can"
 fi
 
-# ── 7. SSH key for this machine (never committed) ────────────────────────────
+# ── 6. SSH key ───────────────────────────────────────────────────────────────
 if [ "$do_ssh" -eq 1 ]; then
   say ""
   if [ "$dry_run" -eq 1 ]; then
@@ -219,14 +223,9 @@ if [ "$dry_run" -eq 1 ]; then
   say "Dry run complete — no changes made."
   say "Apply with:  $repo/setup.sh"
 else
-  say "Done. Everything this repo manages is set up."
+  say "Done."
   say ""
-  say "Reload your shell:"
-  say "  exec bash -l"
-  say ""
+  say "Reload your shell:  exec bash -l"
   say "First nvim launch bootstraps plugins (lazy.nvim) — needs network once."
-  say ""
-  say "Optional next (interactive — never put tokens in this repo):"
-  say "  claude / codex / grok   # each opens its own login on first use"
-  say "  # gh auth: offered during SSH step if not already logged in"
+  say "Re-run optionals anytime:  $repo/ubuntu/optional.sh"
 fi
