@@ -50,14 +50,11 @@ host_title="$(hostname -s 2>/dev/null || hostname)-$(date +%Y%m%d)"
 
 say "== ssh key (this machine only) =="
 
-# Already have any default key?
+# ed25519 only — never fall back to RSA/ECDSA.
 existing=""
-for cand in "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ecdsa" "$HOME/.ssh/id_rsa"; do
-  if [ -f "$cand" ]; then
-    existing="$cand"
-    break
-  fi
-done
+if [ -f "$HOME/.ssh/id_ed25519" ]; then
+  existing="$HOME/.ssh/id_ed25519"
+fi
 
 if [ -n "$existing" ]; then
   say "ok    found $existing"
