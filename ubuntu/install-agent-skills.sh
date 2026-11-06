@@ -48,15 +48,46 @@ normalize_remote() {
   printf '%s\n' "${value%.git}"
 }
 
+github_slug() {
+  case "$1" in
+    git@github.com:*.git) printf '%s\n' "${1#git@github.com:}" | sed 's/\.git$//' ;;
+    https://github.com/*.git) printf '%s\n' "${1#https://github.com/}" | sed 's/\.git$//' ;;
+    *) return 1 ;;
+  esac
+}
+
+ssh_key_present() {
+  local key
+  for key in id_ed25519 id_rsa id_ecdsa id_ed25519_sk; do
+    [ -f "$HOME/.ssh/$key" ] && return 0
+  done
+  return 1
+}
+
+use_gh_clone() {
+  github_slug "$repo_url" >/dev/null \
+    && ! ssh_key_present \
+    && command -v gh >/dev/null 2>&1 \
+    && gh auth status >/dev/null 2>&1
+}
+
 say "== personal agent skills =="
 if [ ! -e "$checkout" ]; then
   if [ "$dry_run" -eq 1 ]; then
-    say "PLAN  clone $repo_url -> $checkout"
+    if use_gh_clone; then
+      say "PLAN  gh repo clone $(github_slug "$repo_url") $checkout"
+    else
+      say "PLAN  git clone $repo_url $checkout"
+    fi
     say "PLAN  check out pinned commit $locked_ref"
     say "PLAN  link skills into harness discovery roots and run doctor"
     exit 0
   fi
-  git clone "$repo_url" "$checkout"
+  if use_gh_clone; then
+    gh repo clone "$(github_slug "$repo_url")" "$checkout"
+  else
+    git clone "$repo_url" "$checkout"
+  fi
 elif [ ! -d "$checkout/.git" ]; then
   die "$checkout exists but is not a Git repository"
 fi

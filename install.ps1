@@ -9,6 +9,7 @@
 #
 #   1. Link WezTerm config into ~/.config/wezterm
 #   2. Pin the user home folder to File Explorer Quick Access (left nav)
+#   3. Install Tailscale via winget when missing (may prompt for admin)
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -89,6 +90,25 @@ function Add-QuickAccessPin {
 }
 
 Add-QuickAccessPin -Path $HOME
+
+# Tailscale covers this Windows host (and therefore WSL). Install when missing.
+function Install-Tailscale {
+  $tailscaleCmd = Get-Command tailscale -ErrorAction SilentlyContinue
+  $tailscaleExe = Join-Path $env:ProgramFiles "Tailscale\tailscale.exe"
+  if ($tailscaleCmd -or (Test-Path -LiteralPath $tailscaleExe)) {
+    Write-Host "ok     Tailscale already installed"
+    return
+  }
+  if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Write-Host "warn   winget missing — install Tailscale from https://tailscale.com/download/windows"
+    return
+  }
+  Write-Host "Installing Tailscale (may prompt for admin)..."
+  winget install -e --id Tailscale.Tailscale --accept-package-agreements --accept-source-agreements
+  Write-Host "Open the Tailscale app and sign in."
+}
+
+Install-Tailscale
 
 Write-Host "Launch WezTerm (or press Ctrl+Shift+R) to load it."
 Write-Host "Open File Explorer - your home folder should be on the left (Quick Access / Home)."

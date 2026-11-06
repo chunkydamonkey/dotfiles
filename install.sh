@@ -8,6 +8,17 @@
 set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Omarchy keeps its own bashrc, tmux, and terminals. Do not fall through
+# to the Ubuntu symlink list below.
+if [ -f /etc/os-release ]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  if [ "${ID:-}" = "omarchy" ]; then
+    exec "$repo/omarchy/install.sh" "$@"
+  fi
+fi
+
 ts="$(date +%Y%m%d-%H%M%S)"
 dry_run=0
 case "${1:-}" in

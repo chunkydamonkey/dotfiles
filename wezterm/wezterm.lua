@@ -39,7 +39,10 @@ wezterm.on("gui-startup", function(cmd)
     end
   end
   local _tab, _pane, window = mux.spawn_window(args)
-  window:gui_window():maximize()
+  -- Hyprland tiles the window. Maximizing here fights that layout.
+  if not is_linux then
+    window:gui_window():maximize()
+  end
 end)
 
 -- Load fonts bundled next to this config (repo/wezterm/fonts). No system
@@ -51,6 +54,7 @@ config.color_scheme = "rose-pine-moon"
 config.font = wezterm.font("Hack Nerd Font") -- Hack ships Regular + Bold only
 config.font_size = 12.0
 config.max_fps = 120
+config.window_background_opacity = 0.95
 
 -- One unified bar (window buttons integrated into the tab bar), always visible
 -- (even with a single tab open).
@@ -142,16 +146,21 @@ if is_windows then
   end
 
   config.win32_system_backdrop = "Acrylic"
-  config.window_background_opacity = 0.7
   config.window_frame.font_size = 10.0
 elseif is_macos then
-  config.window_background_opacity = 0.8
   config.macos_window_background_blur = 50
   config.font_size = 15.0
   config.window_frame.font_size = 13.0
 elseif is_linux then
-  config.window_background_opacity = 0.9
   config.window_frame.font_size = 11.0
+  -- Hyprland owns the window. The minimize, maximize, and close buttons
+  -- stay on Windows, where INTEGRATED_BUTTONS is set above.
+  config.window_decorations = "NONE"
+  -- The fancy tab bar is a grey titlebar strip. Hide it for a single tab.
+  -- Extra tabs use the retro bar, which takes its colors from rose-pine moon.
+  config.hide_tab_bar_if_only_one_tab = true
+  config.use_fancy_tab_bar = false
+  config.show_new_tab_button_in_tab_bar = false
 end
 
 -- Cwd for a new tab/window in the given domain. WSL must use the Linux home

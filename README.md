@@ -1,13 +1,39 @@
 # dotfiles
 
-Cross-platform personal configs (shell, git, WezTerm) plus a **one-command Ubuntu
-setup**. Plain git + bootstrap scripts — works on **Ubuntu**, **WSL2**, and
-**Windows**.
+Cross-platform personal configs (shell, git, WezTerm) plus a **one-command
+setup**. Plain git + bootstrap scripts — works on **Omarchy**, **Ubuntu**,
+**WSL2**, and **Windows**.
 
 Scaffolded from Kun Chen's
 [`dotfiles-mac-nix`](https://github.com/kunchenguid/dotfiles-mac-nix) / maintained
 [`dotfiles`](https://github.com/kunchenguid/dotfiles) (Neovim), then adapted away
 from Nix so Windows/WSL2 work natively.
+
+---
+
+## Fresh Omarchy
+
+Install Grok, then tell it:
+
+> Follow https://github.com/chunkydamonkey/dotfiles/blob/main/.grok/skills/setup-env/SKILL.md
+
+Or run it yourself after a clone:
+
+```bash
+git clone https://github.com/chunkydamonkey/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./setup.sh
+```
+
+`./setup.sh` sees `ID=omarchy` and runs `omarchy/bootstrap.sh`. That installs missing `git`, `github-cli`, `git-lfs`, `wezterm`, and Tailscale, appends a shell snippet and a git include, and makes WezTerm the terminal Super+Return opens. It does **not** replace Omarchy's `~/.bashrc`, tmux config, or LazyVim. Omarchy themes do not recolor WezTerm; it keeps the rose-pine moon settings in `wezterm.lua`.
+
+```bash
+./setup.sh --dry-run     # preview
+./setup.sh --nvim        # also switch Neovim to this repo's config
+./setup.sh --no-skills   # skip the private agent-skills repo
+```
+
+If `gh` is not logged in, setup stops before the private repo and tells you to run `gh auth login`.
 
 ---
 
@@ -42,18 +68,19 @@ gh auth login    # GitHub login + git credential helper
 |------|--------|
 | 1 | `apt update` + `apt upgrade` |
 | 2 | **Core** packages from `ubuntu/packages.txt` (always) |
-| 3 | **Optional** tools — interactive Y/n if missing (`ubuntu/optional.sh`) |
-| 4 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
-| 5 | Prompt for git name/email → `~/.gitconfig.local` if missing |
-| 6 | **SSH key for this machine** — generate if missing; offer `gh` upload |
-| 7 | Clone the private, pinned **agent-skills** repository; link its skills into each harness discovery root; run its doctor |
+| 3 | **Tailscale** — always on native Ubuntu; skipped on WSL (Windows host installs it) |
+| 4 | **Optional** tools — interactive Y/n if missing (`ubuntu/optional.sh`) |
+| 5 | Link configs via `install.sh` (shell, git, tmux, nvim, WezTerm) |
+| 6 | Prompt for git name/email → `~/.gitconfig.local` if missing |
+| 7 | **SSH key for this machine** — generate if missing; offer `gh` upload |
+| 8 | Clone the private, pinned **agent-skills** repository; link its skills into each harness discovery root; run its doctor |
 
 You do **not** need to run `install.sh` yourself on a new machine — `setup.sh`
 calls it.
 
 ### Core vs optional
 
-**Core** (no questions): git, curl, ssh client, build tools, nvim, tmux, rg, gh, …
+**Core** (no questions): git, curl, ssh client, build tools, nvim, tmux, rg, gh, Tailscale, …
 
 **Optional** (asks if not installed; skips if already present):
 
@@ -131,11 +158,12 @@ winget install --id wez.wezterm -e
 # 2. New terminal, then authenticate
 gh auth login
 
-# 3. Clone + link WezTerm config
+# 3. Clone + link WezTerm config + install Tailscale if missing
 gh repo clone chunkydamonkey/dotfiles "$HOME\dotfiles"
 powershell -ExecutionPolicy Bypass -File "$HOME\dotfiles\install.ps1"
 
 # 4. Launch WezTerm — config + Hack Nerd Font come from the repo
+# 5. Open the Tailscale app and sign in (covers this PC and WSL)
 ```
 
 ---
@@ -144,12 +172,21 @@ powershell -ExecutionPolicy Bypass -File "$HOME\dotfiles\install.ps1"
 
 ```
 dotfiles/
-├── setup.sh            # ONE script for a new Ubuntu machine
-├── install.sh          # Linux/macOS: symlink configs only (called by setup.sh)
-├── install.ps1         # Windows: junction WezTerm config (no admin)
+├── setup.sh            # Omarchy or Ubuntu/Debian, picked from /etc/os-release
+├── install.sh          # Linux/macOS symlinks; Omarchy uses omarchy/install.sh
+├── install.ps1         # Windows: WezTerm junction + Tailscale via winget
 ├── agent-skills.lock   # private skill-repo URL + tested full commit
+├── playbooks/
+│   └── omarchy.md      # what the agent may and may not change
+├── omarchy/
+│   ├── bootstrap.sh    # omarchy pkg + safe linker + agent-skills
+│   ├── install.sh      # append bashrc snippet and git include
+│   └── hypr/
+│       ├── bindings.lua  # → ~/.config/hypr/bindings.lua (vim focus/swap)
+│       └── input.lua     # → ~/.config/hypr/input.lua (3-finger workspace swipe)
 ├── ubuntu/
 │   ├── bootstrap.sh         # guts of setup.sh
+│   ├── install-tailscale.sh # always-on Tailscale (skipped on WSL)
 │   ├── packages.txt         # core apt packages (always)
 │   ├── optional.sh          # interactive Docker / WezTerm / AI CLIs / …
 │   ├── install-wezterm.sh   # WezTerm apt repo helper
@@ -157,9 +194,11 @@ dotfiles/
 │   ├── install-agent-skills.sh # clone pinned private skill registry + link/doctor
 │   └── tools.sh             # non-interactive bulk vendor CLI helper
 ├── shell/
-│   ├── bashrc          # → ~/.bashrc
+│   ├── bashrc          # → ~/.bashrc (Ubuntu/macOS)
+│   ├── omarchy.bash    # sourced from Omarchy's ~/.bashrc
 │   ├── profile         # → ~/.profile
-│   └── gitconfig       # → ~/.gitconfig (identity via ~/.gitconfig.local)
+│   ├── gitconfig       # → ~/.gitconfig (identity via ~/.gitconfig.local)
+│   └── gitconfig.omarchy  # included from Omarchy's ~/.config/git/config
 ├── nvim/               # → ~/.config/nvim  (from kunchenguid/dotfiles)
 ├── tmux/
 │   └── tmux.conf       # → ~/.tmux.conf
@@ -187,6 +226,9 @@ history, path-aware splits, vi keys. Prefix stays `C-b` (herdr-friendly).
 
 - **`install.sh`** never deletes real files. Anything in the way is moved to
   `*.pre-dotfiles.<timestamp>`, then replaced with a symlink. Re-running is safe.
+- **On Omarchy**, `install.sh` does not replace `~/.bashrc` or tmux.
+  It appends a marked block, links WezTerm, and writes `~/.config/xdg-terminals.list`.
+  Neovim changes only with `./setup.sh --nvim`.
 - **`~/.gitconfig.local`** holds your name/email and is **not** committed (so the
   public repo stays free of personal identity).
 - **SSH keys** are generated per machine under `~/.ssh/` and never committed;
@@ -206,6 +248,7 @@ history, path-aware splits, vi keys. Prefix stays `C-b` (herdr-friendly).
 | Manage a new app config | Add a folder, wire it in `install.sh` (and `install.ps1` if Windows), run `./install.sh` once |
 | Install/repair personal agent skills | `./ubuntu/install-agent-skills.sh` |
 | Configs only (packages already OK) | `./install.sh` then `exec bash -l` |
+| Omarchy shell snippet only | `./omarchy/install.sh` (does not replace `~/.bashrc`) |
 | SSH key for GitHub | `ssh-keygen -t ed25519 -C "you@example.com"` then `gh auth login` or add the `.pub` on GitHub |
 
 After the first setup, **pulling** updates live configs (they are symlinks into the

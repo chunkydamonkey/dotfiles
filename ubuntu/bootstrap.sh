@@ -4,11 +4,12 @@
 # Flow:
 #   1. apt update + upgrade
 #   2. Core packages from ubuntu/packages.txt (always)
-#   3. Optional tools — interactive prompts (Docker, WezTerm, AI CLIs, …)
-#   4. Link configs via ../install.sh
-#   5. Git identity if ~/.gitconfig.local is missing
-#   6. SSH key for this machine (generate if missing; optional gh upload)
-#   7. Clone the pinned private agent-skills repo, link skills, and run its doctor
+#   3. Tailscale — always (native Ubuntu; skipped on WSL → Windows host)
+#   4. Optional tools — interactive prompts (Docker, WezTerm, AI CLIs, …)
+#   5. Link configs via ../install.sh
+#   6. Git identity if ~/.gitconfig.local is missing
+#   7. SSH key for this machine (generate if missing; optional gh upload)
+#   8. Clone the pinned private agent-skills repo, link skills, and run its doctor
 #
 # Safe: idempotent packages; install.sh backs up real files before linking.
 # Optional installs never force; missing + no TTY → skip (use --yes to auto-accept
@@ -172,7 +173,15 @@ elif command -v fdfind >/dev/null 2>&1 && [ ! -e "$HOME/.local/bin/fd" ]; then
   ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
 fi
 
-# ── 3. Optional tools (interactive) ──────────────────────────────────────────
+# ── 3. Tailscale (always; WSL installs on the Windows host instead) ──────────
+say ""
+if [ "$dry_run" -eq 1 ]; then
+  "$repo/ubuntu/install-tailscale.sh" --dry-run
+else
+  "$repo/ubuntu/install-tailscale.sh"
+fi
+
+# ── 4. Optional tools (interactive) ──────────────────────────────────────────
 if [ "$do_optional" -eq 1 ]; then
   say ""
   set +e
@@ -181,7 +190,7 @@ if [ "$do_optional" -eq 1 ]; then
   set -e
 fi
 
-# ── 4. Link configs ──────────────────────────────────────────────────────────
+# ── 5. Link configs ──────────────────────────────────────────────────────────
 if [ "$do_link" -eq 1 ]; then
   say ""
   say "== link dotfiles (install.sh) =="
@@ -192,7 +201,7 @@ if [ "$do_link" -eq 1 ]; then
   fi
 fi
 
-# ── 5. Git identity ──────────────────────────────────────────────────────────
+# ── 6. Git identity ──────────────────────────────────────────────────────────
 gitconfig_local="$HOME/.gitconfig.local"
 if [ -f "$gitconfig_local" ]; then
   say ""
@@ -229,7 +238,7 @@ else
   say "skip  no TTY — create $gitconfig_local manually when you can"
 fi
 
-# ── 6. SSH key ───────────────────────────────────────────────────────────────
+# ── 7. SSH key ───────────────────────────────────────────────────────────────
 if [ "$do_ssh" -eq 1 ]; then
   say ""
   if [ "$dry_run" -eq 1 ]; then
@@ -241,7 +250,7 @@ if [ "$do_ssh" -eq 1 ]; then
   fi
 fi
 
-# ── 7. Personal agent skills (private, pinned, cross-harness) ────────────────
+# ── 8. Personal agent skills (private, pinned, cross-harness) ────────────────
 if [ "$do_skills" -eq 1 ]; then
   say ""
   if [ "$dry_run" -eq 1 ]; then

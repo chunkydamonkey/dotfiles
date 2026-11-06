@@ -1,0 +1,17 @@
+[Desktop Entry]
+Name=WezTerm
+GenericName=Terminal
+Comment=A GPU-accelerated cross-platform terminal emulator
+TryExec=wezterm
+# --class wezterm matches Omarchy's terminal window rule. xdg-terminal-exec
+# may append another --class when Omarchy asks for a specific app id.
+Exec=wezterm start --class wezterm
+Icon=org.wezfurlong.wezterm
+Terminal=false
+Type=Application
+Categories=System;TerminalEmulator;
+StartupNotify=true
+StartupWMClass=wezterm
+X-TerminalArgExec=--
+X-TerminalArgDir=--cwd
+X-TerminalArgAppId=--class

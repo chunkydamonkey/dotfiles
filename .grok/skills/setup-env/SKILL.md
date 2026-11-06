@@ -1,7 +1,7 @@
 ---
 name: setup-env
 description: >
-  Set up this dotfiles repo on the current machine: detect Linux (Ubuntu/Debian),
+  Set up this dotfiles repo on the current machine: detect Omarchy, Ubuntu/Debian,
   WSL2, Windows, or macOS, ask the user about optional steps, then run the matching
   bootstrap/link scripts (setup.sh, install.sh, install.ps1, tools, SSH, WezTerm).
   Use when the user asks to set up the environment, bootstrap a new machine, install
@@ -12,7 +12,7 @@ description: >
 
 Drive a full or partial setup of **this** repository (`chunkydamonkey/dotfiles`) for the machine the agent is running on.
 
-Do **not** invent install steps. Prefer the scripts already in the repo. Re-reads of `README.md`, `setup.sh`, `install.sh`, `install.ps1`, and `ubuntu/*` beat memory if anything looks out of date.
+Do **not** invent install steps. Prefer the scripts already in the repo. Re-reads of `README.md`, `setup.sh`, `install.sh`, `install.ps1`, `playbooks/omarchy.md`, `omarchy/*`, and `ubuntu/*` beat memory if anything looks out of date.
 
 ## Goals
 
@@ -31,6 +31,7 @@ Do **not** invent install steps. Prefer the scripts already in the repo. Re-read
 - WezTerm on Windows is installed by **`install.ps1` on the Windows host**. From WSL, the agent **can and should** run it via `powershell.exe` interop when the user wants the Windows half (see below). Do not use Linux `install.sh` for WezTerm on WSL.
 - Do not run destructive git commands. Setup does not need force-push, reset --hard, etc.
 - Ask before `sudo`-heavy full bootstraps if the user only wanted config links.
+- On Omarchy (`ID=omarchy`): run `./setup.sh` or `omarchy/bootstrap.sh`. Read `playbooks/omarchy.md` before asking questions or applying changes. Do not run `ubuntu/bootstrap.sh` or the Ubuntu symlink list.
 
 ---
 
@@ -85,9 +86,10 @@ wsl -l -v   # if present; ignore failure
 
 | Detection | Path ID | Primary scripts |
 |-----------|---------|-----------------|
+| Linux + `/etc/os-release` `ID=omarchy` | `omarchy` | `./setup.sh` → `omarchy/bootstrap.sh`. Read `playbooks/omarchy.md` first |
 | Linux + Ubuntu/Debian family + **not** WSL | `linux-native` | `./setup.sh` (full) or `./install.sh` (link only) |
 | Linux + Ubuntu/Debian + **WSL** | `wsl` | `./setup.sh` for Linux side; remind user about Windows `install.ps1` for WezTerm |
-| Linux but not Debian/Ubuntu | `linux-other` | `./install.sh` only (bootstrap apt scripts will refuse) |
+| Linux but not Debian/Ubuntu and not Omarchy | `linux-other` | `./install.sh` only (bootstrap apt scripts will refuse) |
 | Darwin / macOS | `macos` | `./install.sh` only (no `setup.sh` apt bootstrap) |
 | Windows (PowerShell / cmd / win32 agent host) | `windows` | winget tools + `install.ps1` |
 | Unknown | stop and ask | — |
@@ -138,6 +140,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${REPO_WIN}\\install.ps
 
 `install.ps1` targets the WSL repo over `\\wsl.localhost\...` (symlink if Developer Mode/elevated; otherwise copies `wezterm/`). Also pins Windows `%USERPROFILE%` to Explorer Quick Access.
 
+#### `omarchy`
+
+Read `playbooks/omarchy.md` and follow it. Questions and the never-list live there. Defaults: keep LazyVim, skip herdr / Claude Code / Codex / treehouse. WezTerm is the Omarchy default terminal; the playbook installs it from Arch and writes `xdg-terminals.list`.
+
+```bash
+./setup.sh                 # safe links + packages + agent-skills if gh is logged in
+./setup.sh --dry-run
+./setup.sh --nvim          # only after the user agrees to replace LazyVim
+./setup.sh --no-skills
+```
+
 #### `macos` / `linux-other`
 
 | Option | Action | Default |
@@ -178,6 +191,17 @@ Prefer doing this **before** `./setup.sh` when the agent has no TTY for `read` p
 ## Step 3 — Execute by path
 
 Confirm the plan in one short bullet list, then run.
+
+### A0. `omarchy`
+
+Follow `playbooks/omarchy.md`. Then:
+
+```bash
+cd "<repo-root>"
+./setup.sh [--dry-run] [--nvim] [--no-skills]
+```
+
+Do not pass Ubuntu flags (`--yes`, `--packages-only`, `--no-wezterm`). Do not run `ubuntu/bootstrap.sh`.
 
 ### A. `linux-native` or `wsl` — full setup
 
@@ -230,7 +254,7 @@ Optional:
 ./ubuntu/setup-ssh.sh   # if user wants SSH helper
 ```
 
-Do **not** run `./setup.sh` on non-Debian/Ubuntu; it will error by design.
+Do **not** run `./setup.sh` on non-Debian/Ubuntu **except Omarchy**. Omarchy is handled in A0. Other non-Debian distros still error in `ubuntu/bootstrap.sh` by design.
 
 ### C. `windows`
 
@@ -287,7 +311,11 @@ After applying changes (skip heavy checks on dry-run):
 
 | Check | Command / expectation |
 |-------|------------------------|
-| Shell linked | `readlink ~/.bashrc` → repo `shell/bashrc` (Unix) |
+| Shell linked (not Omarchy) | `readlink ~/.bashrc` → repo `shell/bashrc` (Unix) |
+| Omarchy shell | `~/.bashrc` is still a regular file and contains `# >>> dotfiles omarchy >>>` |
+| Omarchy git | `~/.config/git/config` includes `shell/gitconfig.omarchy`; `user.name` unchanged |
+| Omarchy left alone | no new `~/.tmux.conf` from this run |
+| Omarchy WezTerm | `readlink ~/.config/wezterm` → repo `wezterm`; `xdg-terminal-exec --print-id` is `org.wezfurlong.wezterm.desktop` |
 | Git config include | `git config --get user.name` works if local identity set |
 | nvim | `readlink ~/.config/nvim` → repo `nvim` (Unix) |
 | WezTerm (native Linux/mac) | `readlink ~/.config/wezterm` → repo `wezterm` |
@@ -321,14 +349,18 @@ End with:
 
 | Script | Role |
 |--------|------|
-| `setup.sh` | Ubuntu/Debian entry → `ubuntu/bootstrap.sh` |
+| `setup.sh` | Omarchy → `omarchy/bootstrap.sh`; otherwise Ubuntu/Debian → `ubuntu/bootstrap.sh` |
+| `omarchy/bootstrap.sh` | `omarchy pkg add`, safe linker, agent-skills if `gh` is logged in |
+| `omarchy/install.sh` | append bashrc snippet and git include; `--nvim` optional |
+| `playbooks/omarchy.md` | Omarchy policy: what to ask, what never to touch |
 | `ubuntu/bootstrap.sh` | apt, wezterm, tools, link, git identity, ssh |
 | `ubuntu/packages.txt` | apt package list |
 | `ubuntu/install-wezterm.sh` | WezTerm apt (skips WSL) |
+| `ubuntu/install-tailscale.sh` | Tailscale always (skips WSL → Windows host) |
 | `ubuntu/tools.sh` | third-party CLI installers |
 | `ubuntu/setup-ssh.sh` | ed25519 key + optional `gh` upload |
 | `install.sh` | symlink configs (Linux/macOS; WezTerm skipped on WSL) |
-| `install.ps1` | Windows junction for WezTerm only |
+| `install.ps1` | Windows WezTerm junction + Tailscale via winget |
 
 Flags for `setup.sh` / `bootstrap.sh`:
 
@@ -346,7 +378,8 @@ Flags for `setup.sh` / `bootstrap.sh`:
 
 | Symptom | Likely fix |
 |---------|------------|
-| `setup.sh` errors “targets Ubuntu/Debian” | Use `install.sh` only; wrong path ID |
+| `setup.sh` errors “targets Ubuntu/Debian” | Not Omarchy and not Debian. Use `install.sh` only |
+| Omarchy bashrc was replaced | Wrong script. Restore the `*.pre-dotfiles.*` backup and re-run `./omarchy/install.sh` |
 | WezTerm still cmd on Windows | Re-run `install.ps1`; fully quit WezTerm; confirm junction + WSL domain in `wezterm.lua` |
 | WSL setup linked WezTerm unexpectedly | Should not happen; `install.sh` skips WezTerm on WSL — check `is_wsl` |
 | No TTY → git identity skipped | Agent writes `~/.gitconfig.local` after asking user |
