@@ -16,6 +16,7 @@ Use this when `/etc/os-release` has `ID=omarchy`. Run `./setup.sh`. It dispatche
 - Install Tailscale with `omarchy-install-service-tailscale` when `omarchy-installed-service-tailscale` fails. That is Omarchy's own installer: the package, `tailscaled`, `tailscale up` (the user logs in), the menu bar plugin, and Taildrop into `~/Downloads`. Do not use the old `tsui` sudoers grant.
 - Append the shell snippet and the git include (`core.editor`, `gh` credential helper, LFS). Name and email stay in Omarchy's `~/.config/git/config`.
 - Link `wezterm/` to `~/.config/wezterm`, install `omarchy/org.wezfurlong.wezterm.desktop` so Super+Return can pass a working directory, and put that desktop id first in `~/.config/xdg-terminals.list`. `omarchy default terminal` cannot name WezTerm; this list is how Omarchy launches it.
+- Set Google Chrome as default browser (`google-chrome.desktop`) via `xdg-settings` / `omarchy default browser chrome`.
 - Link `omarchy/hypr/bindings.lua` and `omarchy/hypr/input.lua` into `~/.config/hypr/` (vim-style Super+h/j/k/l focus and swap, Super+M full width, Windows-style recent Super+Tab and Alt+Tab, three-finger workspace swipe). After `omarchy refresh hyprland`, re-run `omarchy/install.sh` so the links come back.
 
 ## Ask first
@@ -50,6 +51,7 @@ If `gh auth status` fails, stop after the safe linker and tell the user to run `
 - `~/.tmux.conf` does not exist because of this run.
 - `readlink ~/.config/wezterm` points at the repo `wezterm/` directory.
 - `xdg-terminal-exec --print-id` prints `org.wezfurlong.wezterm.desktop`.
+- `omarchy-cmd-default-browser` (or `xdg-settings get default-web-browser`) prints `google-chrome.desktop`.
 - `readlink ~/.config/hypr/bindings.lua` and `input.lua` point at the repo `omarchy/hypr/` files.
 - `readlink ~/.config/nvim` points at the repo only when `--nvim` was passed.
 - `gh auth status` succeeds before `~/agent-skills` is expected.
