@@ -152,15 +152,26 @@ elseif is_macos then
   config.font_size = 15.0
   config.window_frame.font_size = 13.0
 elseif is_linux then
-  config.window_frame.font_size = 11.0
   -- Hyprland owns the window. The minimize, maximize, and close buttons
   -- stay on Windows, where INTEGRATED_BUTTONS is set above.
   config.window_decorations = "NONE"
-  -- The fancy tab bar is a grey titlebar strip. Hide it for a single tab.
-  -- Extra tabs use the retro bar, which takes its colors from rose-pine moon.
+  -- The fancy tab bar, recolored to rose-pine moon instead of its default
+  -- grey, so tabs can be taller with bigger text than the one-row retro bar.
+  -- Hidden while only one tab is open.
   config.hide_tab_bar_if_only_one_tab = true
-  config.use_fancy_tab_bar = false
+  config.use_fancy_tab_bar = true
   config.show_new_tab_button_in_tab_bar = false
+  config.tab_max_width = 32
+  config.window_frame.font_size = 13.0
+  config.window_frame.active_titlebar_bg = "#232136" -- base
+  config.window_frame.inactive_titlebar_bg = "#232136"
+  config.colors = config.colors or {}
+  config.colors.tab_bar = {
+    inactive_tab_edge = "#393552", -- overlay
+    active_tab = { bg_color = "#393552", fg_color = "#e0def4" }, -- overlay / text
+    inactive_tab = { bg_color = "#2a273f", fg_color = "#908caa" }, -- surface / subtle
+    inactive_tab_hover = { bg_color = "#44415a", fg_color = "#e0def4" }, -- highlight med
+  }
 end
 
 -- Cwd for a new tab/window in the given domain. WSL must use the Linux home
@@ -309,6 +320,31 @@ wezterm.on("update-status", function(window, _pane)
   if tab then
     record_tab(window_id, tab:tab_id())
   end
+end)
+
+-- Tab titles lead with a circled number from the Nerd Font in place of "1:":
+-- filled on the active tab, outlined on the rest, and 9+ past nine.
+local function tab_number_icon(n, active)
+  local name = n <= 9 and ("md_numeric_" .. n .. "_circle") or "md_numeric_9_plus_circle"
+  if not active then
+    name = name .. "_outline"
+  end
+  local ok, glyph = pcall(function()
+    return wezterm.nerdfonts[name]
+  end)
+  if ok and glyph then
+    return glyph
+  end
+  return n .. ":"
+end
+
+wezterm.on("format-tab-title", function(tab, _tabs, _panes, _config, _hover, max_width)
+  local title = tab.tab_title
+  if not title or #title == 0 then
+    title = tab.active_pane.title
+  end
+  local text = " " .. tab_number_icon(tab.tab_index + 1, tab.is_active) .. "  " .. title .. " "
+  return wezterm.truncate_right(text, max_width)
 end)
 
 -- ── Keys ────────────────────────────────────────────────────────────────────
