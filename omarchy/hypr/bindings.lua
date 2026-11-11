@@ -18,12 +18,14 @@
 
 -- Vim-style focus: same as SUPER + arrows.
 -- Replaces: SUPER+J toggle split, SUPER+K keybindings menu, SUPER+L cycle layout.
--- SUPER+M was minimize to dock; now full width (same as SUPER + ALT + F).
 o.rebind("SUPER + H", "Focus on left window", hl.dsp.focus({ direction = "l" }))
 o.rebind("SUPER + J", "Focus on below window", hl.dsp.focus({ direction = "d" }))
 o.rebind("SUPER + K", "Focus on above window", hl.dsp.focus({ direction = "u" }))
 o.rebind("SUPER + L", "Focus on right window", hl.dsp.focus({ direction = "r" }))
-o.rebind("SUPER + M", "Full width", hl.dsp.window.fullscreen({ mode = "maximized" }))
+
+-- ALT + M: full width (same as SUPER + ALT + F), next to ALT + TAB.
+-- SUPER + M keeps Omarchy's minimize to the dock.
+o.bind("ALT + M", "Full width", hl.dsp.window.fullscreen({ mode = "maximized" }))
 
 -- Same as SUPER + SHIFT + arrows.
 o.bind("SUPER + SHIFT + H", "Swap window to the left", hl.dsp.window.swap({ direction = "l" }))
@@ -359,3 +361,87 @@ end)
 o.rebind("ALT + SHIFT + TAB", "Focus on previous window (MRU)", function()
   step_window(-1)
 end)
+
+-- SUPER + E: even grid. Floats every window on the workspace into equal cells,
+-- 2 as halves, 4 as quarters, a short last row stretched across. Press again
+-- to hand them back to tiling.
+local grid_gap_out = 10 -- general.gaps_out
+local grid_gap_in = 10 -- twice general.gaps_in
+local gridded = {}
+
+local function grid_windows(workspace_id)
+  local out = {}
+  for _, window in ipairs(hl.get_workspace_windows(tostring(workspace_id))) do
+    if window.mapped ~= false then
+      table.insert(out, window)
+    end
+  end
+  return out
+end
+
+local function grid_toggle()
+  local workspace = hl.get_active_workspace()
+  if not workspace then
+    return
+  end
+  local id = workspace.id
+  local windows = grid_windows(id)
+
+  if gridded[id] then
+    gridded[id] = nil
+    for _, window in ipairs(windows) do
+      hl.dispatch(hl.dsp.window.float({ action = "off", window = "address:" .. window.address }))
+    end
+    return
+  end
+
+  local count = #windows
+  if count == 0 then
+    return
+  end
+  local monitor = hl.get_active_monitor()
+  if not monitor or not monitor.scale or monitor.scale <= 0 then
+    return
+  end
+
+  local width = monitor.width / monitor.scale
+  local height = monitor.height / monitor.scale
+  if (monitor.transform or 0) % 2 == 1 then
+    width, height = height, width
+  end
+  local reserved = monitor.reserved or {}
+  local left = (monitor.x or 0) + (reserved.left or 0) + grid_gap_out
+  local top = (monitor.y or 0) + (reserved.top or 0) + grid_gap_out
+  width = width - (reserved.left or 0) - (reserved.right or 0) - grid_gap_out * 2
+  height = height - (reserved.top or 0) - (reserved.bottom or 0) - grid_gap_out * 2
+
+  local cols = math.ceil(math.sqrt(count))
+  local rows = math.ceil(count / cols)
+  local cell_h = (height - grid_gap_in * (rows - 1)) / rows
+
+  gridded[id] = true
+  for i, window in ipairs(windows) do
+    local row = math.floor((i - 1) / cols)
+    local col = (i - 1) % cols
+    local in_row = math.min(cols, count - row * cols)
+    local cell_w = (width - grid_gap_in * (in_row - 1)) / in_row
+    local target = "address:" .. window.address
+    -- A maximized (Super+M) or fullscreen window would cover the grid.
+    if (window.fullscreen or 0) ~= 0 then
+      local mode = window.fullscreen == 1 and "maximized" or "fullscreen"
+      hl.dispatch(hl.dsp.window.fullscreen({ mode = mode, action = "unset", window = target }))
+    end
+    hl.dispatch(hl.dsp.window.float({ action = "on", window = target }))
+    hl.dispatch(hl.dsp.window.resize({ x = math.floor(cell_w), y = math.floor(cell_h), relative = false, window = target }))
+    hl.dispatch(hl.dsp.window.move({
+      x = math.floor(left + col * (cell_w + grid_gap_in)),
+      y = math.floor(top + row * (cell_h + grid_gap_in)),
+      relative = false,
+      window = target,
+    }))
+  end
+end
+
+-- Reachable from `hyprctl repl 'o.grid_toggle()'` to test without the key.
+o.grid_toggle = grid_toggle
+o.bind("SUPER + E", "Even grid of the workspace's windows (toggle)", grid_toggle)
