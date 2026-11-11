@@ -185,6 +185,15 @@ else
   say "warn  could not switch the bar; once the shell runs: omarchy plugin enable $workspaces_id"
 fi
 
+say "== agent rules =="
+# One rules file for every coding agent: Claude Code, Grok, Codex.
+for dir in .claude .grok/rules .codex; do
+  if [ "$dry_run" -eq 0 ]; then mkdir -p "$HOME/$dir"; fi
+done
+link_one "$repo/agents/AGENTS.md" "$HOME/.claude/CLAUDE.md"
+link_one "$repo/agents/AGENTS.md" "$HOME/.grok/rules/AGENTS.md"
+link_one "$repo/agents/AGENTS.md" "$HOME/.codex/AGENTS.md"
+
 say "== wezterm =="
 link_one "$repo/wezterm" "$HOME/.config/wezterm"
 if [ "$dry_run" -eq 0 ]; then

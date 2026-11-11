@@ -176,6 +176,8 @@ dotfiles/
 ├── install.sh          # Linux/macOS symlinks; Omarchy uses omarchy/install.sh
 ├── install.ps1         # Windows: WezTerm junction + Tailscale via winget
 ├── agent-skills.lock   # private skill-repo URL + tested full commit
+├── agents/
+│   └── AGENTS.md       # rules for every agent → ~/.claude/CLAUDE.md, ~/.grok/rules/, ~/.codex/
 ├── playbooks/
 │   └── omarchy.md      # what the agent may and may not change
 ├── omarchy/
