@@ -10,6 +10,7 @@
 #   1. Link WezTerm config into ~/.config/wezterm
 #   2. Pin the user home folder to File Explorer Quick Access (left nav)
 #   3. Install Tailscale via winget when missing (may prompt for admin)
+#   4. Link agents/AGENTS.md for Claude Code, Grok and Codex (copy without symlink rights)
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -52,6 +53,48 @@ try {
   $mode = "Copy"
 }
 Write-Host "Installed ($mode) $dst  <-  $src"
+
+# One rules file for every coding agent run from PowerShell: Claude Code,
+# Grok, Codex. A file symlink needs Developer Mode or an elevated shell; without
+# either, the file is copied (re-run install.ps1 after editing agents/AGENTS.md).
+# A real file already at a target is renamed, never deleted.
+function Install-AgentRules {
+  $rules = Join-Path $repo "agents\AGENTS.md"
+  if (-not (Test-Path -LiteralPath $rules)) {
+    Write-Host "warn   agent rules not found: $rules"
+    return
+  }
+  $targets = @(
+    (Join-Path $HOME ".claude\CLAUDE.md"),
+    (Join-Path $HOME ".grok\rules\AGENTS.md"),
+    (Join-Path $HOME ".codex\AGENTS.md")
+  )
+  $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+  foreach ($target in $targets) {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+    if (Test-Path -LiteralPath $target) {
+      $item = Get-Item -LiteralPath $target -Force
+      if ($item.LinkType) {
+        $item.Delete()
+      } elseif ((Get-FileHash -LiteralPath $target).Hash -ne (Get-FileHash -LiteralPath $rules).Hash) {
+        $backup = "$target.pre-dotfiles.$stamp"
+        Move-Item -LiteralPath $target -Destination $backup
+        Write-Host "backup $target  ->  $backup"
+      } else {
+        Remove-Item -LiteralPath $target -Force
+      }
+    }
+    try {
+      New-Item -ItemType SymbolicLink -Path $target -Target $rules | Out-Null
+      Write-Host "link   $target  ->  $rules"
+    } catch {
+      Copy-Item -LiteralPath $rules -Destination $target -Force
+      Write-Host "copy   $target  <-  $rules  (no symlink rights; re-run after editing the rules)"
+    }
+  }
+}
+
+Install-AgentRules
 
 # Pin %USERPROFILE% to File Explorer Quick Access (left sidebar).
 # pintohome toggles - only invoke when not already pinned.
