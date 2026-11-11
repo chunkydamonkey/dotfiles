@@ -223,7 +223,7 @@ end)
 -- Even grid. Floats every window on the workspace into equal cells, 2 as
 -- halves, 4 as quarters, a short last row stretched across. Releasing it puts
 -- each window back the way it was: tiled, floating, or maximized.
--- SUPER + E toggles it; ALT + TAB shows it while Alt is held (below).
+-- SUPER + E toggles it.
 local grid_gap_out = 10 -- general.gaps_out
 local grid_gap_in = 10 -- twice general.gaps_in
 -- Each gridded window carries tags saying it is in a grid and how it was
@@ -453,8 +453,10 @@ local win_cycle_ws = nil
 local win_cycle_list = {}
 local win_cycle_index = 1
 local win_cycle_target = nil
--- Workspace that ALT + TAB laid out as a grid, to put back when Alt is let go.
-local win_cycle_grid = nil
+-- While Alt is held, a maximized or fullscreen window steps aside so the tiled
+-- layout shows every window in place; letting go gives that state to the
+-- chosen window. Nothing floats, so the layout never reshuffles.
+local win_cycle_cover = nil
 
 local function record_win(addr)
   if not addr or addr == "" then
@@ -549,10 +551,14 @@ local function step_window(step)
     win_cycle_ws = ws.id
     win_cycle_index = 1
     win_cycling = true
-    -- Show every window while Alt is held. A grid the user made with
-    -- SUPER + E stays when Alt is let go.
-    if #win_cycle_list >= 2 and not is_gridded(ws.id) and grid_on(ws.id) then
-      win_cycle_grid = ws.id
+    win_cycle_cover = nil
+    if #win_cycle_list >= 2 and not is_gridded(ws.id) then
+      for _, window in ipairs(hl.get_workspace_windows(tostring(ws.id))) do
+        if (window.fullscreen or 0) ~= 0 then
+          win_cycle_cover = window.fullscreen == 1 and "maximized" or "fullscreen"
+          hl.dispatch(hl.dsp.window.fullscreen({ mode = win_cycle_cover, action = "unset", window = "address:" .. window.address }))
+        end
+      end
     end
   end
 
@@ -574,13 +580,11 @@ local function finish_win_cycle()
   win_cycling = false
   local win = hl.get_active_window()
   local final_addr = (win and win.address) or win_cycle_target
-  if win_cycle_grid then
-    grid_off(win_cycle_grid, final_addr)
-    win_cycle_grid = nil
-    if final_addr then
-      hl.dispatch(hl.dsp.focus({ window = "address:" .. final_addr }))
-    end
+  if win_cycle_cover and final_addr then
+    hl.dispatch(hl.dsp.focus({ window = "address:" .. final_addr }))
+    hl.dispatch(hl.dsp.window.fullscreen({ mode = win_cycle_cover, action = "set" }))
   end
+  win_cycle_cover = nil
   if final_addr then
     record_win(final_addr)
   end

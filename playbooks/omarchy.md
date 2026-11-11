@@ -17,7 +17,7 @@ Use this when `/etc/os-release` has `ID=omarchy`. Run `./setup.sh`. It dispatche
 - Append the shell snippet and the git include (`core.editor`, `gh` credential helper, LFS). Name and email stay in Omarchy's `~/.config/git/config`.
 - Link `wezterm/` to `~/.config/wezterm`, install `omarchy/org.wezfurlong.wezterm.desktop` so Super+Return can pass a working directory, and put that desktop id first in `~/.config/xdg-terminals.list`. `omarchy default terminal` cannot name WezTerm; this list is how Omarchy launches it.
 - Set Google Chrome as default browser (`google-chrome.desktop`) via `xdg-settings` / `omarchy default browser chrome`.
-- Link `omarchy/hypr/bindings.lua` and `omarchy/hypr/input.lua` into `~/.config/hypr/` (vim-style Super+h/j/k/l focus and swap, Windows-style recent Super+Tab and Alt+Tab, Alt+M full width, Super+E even grid of the workspace's windows (Alt+Tab shows it while Alt is held), three-finger workspace swipe). After `omarchy refresh hyprland`, re-run `omarchy/install.sh` so the links come back.
+- Link `omarchy/hypr/bindings.lua` and `omarchy/hypr/input.lua` into `~/.config/hypr/` (vim-style Super+h/j/k/l focus and swap, Windows-style recent Super+Tab and Alt+Tab, Alt+M full width, Super+E even grid of the workspace's windows, Alt+Tab un-maximizing while Alt is held, three-finger workspace swipe). After `omarchy refresh hyprland`, re-run `omarchy/install.sh` so the links come back.
 
 ## Ask first
 
