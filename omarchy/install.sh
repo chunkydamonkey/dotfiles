@@ -214,6 +214,22 @@ EOF
   fi
 fi
 
+say "== browser =="
+browser_id="google-chrome.desktop"
+current_browser="$(env -u BROWSER XDG_CURRENT_DESKTOP= xdg-settings get default-web-browser 2>/dev/null || true)"
+if [ "$current_browser" = "$browser_id" ]; then
+  say "ok    default browser is $browser_id"
+else
+  if [ "$dry_run" -eq 1 ]; then
+    say "  DRY-RUN> set default browser to $browser_id"
+  else
+    if command -v xdg-settings >/dev/null 2>&1; then
+      env -u BROWSER XDG_CURRENT_DESKTOP= xdg-settings set default-web-browser "$browser_id"
+      say "set   default browser to $browser_id"
+    fi
+  fi
+fi
+
 say ""
 if [ "$dry_run" -eq 1 ]; then
   say "Dry run complete — no changes made."
