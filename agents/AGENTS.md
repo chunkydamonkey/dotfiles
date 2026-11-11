@@ -105,7 +105,7 @@ with a one-line reason in place of "Fix before merging".
 ### Who did the work
 
 - Name the model and tool that actually did each part, e.g. `Claude Opus 5.5 ·
-  Claude Code` or `Grok 4 · Grok Build`. If parts came from different agents,
+  Claude Code` or `Grok 4.7 · Grok Build`. If parts came from different agents,
   use one row per change instead:
 
   ```markdown
