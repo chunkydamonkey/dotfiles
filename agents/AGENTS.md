@@ -2,8 +2,7 @@
 
 Shared by every coding agent I use. `~/dotfiles/agents/AGENTS.md` is linked to
 `~/.claude/CLAUDE.md` (Claude Code), `~/.grok/rules/AGENTS.md` (Grok) and
-`~/.codex/AGENTS.md` (Codex), on Windows too through `install.ps1`. Edit it
-here, not in those places.
+`~/.codex/AGENTS.md` (Codex). Edit it here, not in those places.
 
 ## Replies
 
