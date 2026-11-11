@@ -181,9 +181,11 @@ dotfiles/
 ├── omarchy/
 │   ├── bootstrap.sh    # omarchy pkg + safe linker + agent-skills
 │   ├── install.sh      # append bashrc snippet and git include
-│   └── hypr/
-│       ├── bindings.lua  # → ~/.config/hypr/bindings.lua (vim focus/swap)
-│       └── input.lua     # → ~/.config/hypr/input.lua (3-finger workspace swipe)
+│   ├── hypr/
+│   │   ├── bindings.lua  # → ~/.config/hypr/bindings.lua (vim focus/swap)
+│   │   └── input.lua     # → ~/.config/hypr/input.lua (3-finger workspace swipe)
+│   └── shell/plugins/
+│       └── chuche.workspaces/  # → ~/.config/omarchy/plugins/ (app icons on workspaces)
 ├── ubuntu/
 │   ├── bootstrap.sh         # guts of setup.sh
 │   ├── install-tailscale.sh # always-on Tailscale (skipped on WSL)
