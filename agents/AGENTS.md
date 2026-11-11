@@ -30,6 +30,18 @@ I read them first to see what I need to do and what you are still doing.
 - A short update in the middle of a task does not need the sections: one line
   saying what you are working on is enough.
 
+## Links
+
+Every time you mention a PR, issue or commit, make it a link I can click,
+using the full URL, in replies, PR descriptions and commit messages alike:
+
+- `[PR #2](https://github.com/<owner>/<repo>/pull/2)`, not `PR #2` or `#2`
+- `[issue #5](https://github.com/<owner>/<repo>/issues/5)`
+- `` [`3ae7ccf`](https://github.com/<owner>/<repo>/commit/3ae7ccf) ``
+
+Where markdown links do not render, such as some terminals, write the bare
+URL next to the name instead: `PR #2 https://github.com/<owner>/<repo>/pull/2`.
+
 ## Pull requests
 
 Every PR description starts with this block, before anything else. I read the
