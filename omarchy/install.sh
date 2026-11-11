@@ -154,6 +154,37 @@ fi
 link_one "$repo/omarchy/hypr/bindings.lua" "$HOME/.config/hypr/bindings.lua"
 link_one "$repo/omarchy/hypr/input.lua" "$HOME/.config/hypr/input.lua"
 
+say "== omarchy shell =="
+# Workspace buttons with an icon per window and an underline on the focused one.
+workspaces_id="chuche.workspaces"
+if [ "$dry_run" -eq 0 ]; then
+  mkdir -p "$HOME/.config/omarchy/plugins"
+fi
+workspaces_dst="$HOME/.config/omarchy/plugins/$workspaces_id"
+# A backup left in the plugins folder would load as a second copy of the
+# plugin, so an existing real folder is moved out of it first.
+if [ -d "$workspaces_dst" ] && [ ! -L "$workspaces_dst" ]; then
+  workspaces_backup="$HOME/.config/omarchy/plugins-backup/$workspaces_id.pre-dotfiles.$(date +%Y%m%d-%H%M%S)"
+  say "backup $workspaces_dst  ->  $workspaces_backup"
+  run "mkdir -p \"$(dirname "$workspaces_backup")\""
+  run "mv \"$workspaces_dst\" \"$workspaces_backup\""
+fi
+if [ "$dry_run" -eq 1 ] && [ -d "$workspaces_dst" ] && [ ! -L "$workspaces_dst" ]; then
+  say "  DRY-RUN> ln -s \"$repo/omarchy/shell/plugins/$workspaces_id\" \"$workspaces_dst\""
+else
+  link_one "$repo/omarchy/shell/plugins/$workspaces_id" "$workspaces_dst"
+fi
+shell_json="$HOME/.config/omarchy/shell.json"
+if [ -f "$shell_json" ] && grep -qF "\"$workspaces_id\"" "$shell_json"; then
+  say "ok    bar uses $workspaces_id"
+elif [ "$dry_run" -eq 1 ]; then
+  say "  DRY-RUN> omarchy plugin enable $workspaces_id"
+elif omarchy-shell shell rescanPlugins >/dev/null 2>&1 && omarchy plugin enable "$workspaces_id" >/dev/null 2>&1; then
+  say "set   bar uses $workspaces_id"
+else
+  say "warn  could not switch the bar; once the shell runs: omarchy plugin enable $workspaces_id"
+fi
+
 say "== wezterm =="
 link_one "$repo/wezterm" "$HOME/.config/wezterm"
 if [ "$dry_run" -eq 0 ]; then
