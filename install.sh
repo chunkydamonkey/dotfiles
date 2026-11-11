@@ -88,6 +88,17 @@ elif [ "$is_wsl" -eq 1 ]; then
   say "== wezterm: skipped (WSL — WezTerm runs on the Windows host via install.ps1) =="
 fi
 
+if [ "$os" = "linux" ] || [ "$os" = "macos" ]; then
+  say "== agent rules =="
+  # One rules file for every coding agent: Claude Code, Grok, Codex.
+  for dir in .claude .grok/rules .codex; do
+    if [ "$dry_run" -eq 0 ]; then mkdir -p "$HOME/$dir"; fi
+  done
+  link_one "$repo/agents/AGENTS.md" "$HOME/.claude/CLAUDE.md"
+  link_one "$repo/agents/AGENTS.md" "$HOME/.grok/rules/AGENTS.md"
+  link_one "$repo/agents/AGENTS.md" "$HOME/.codex/AGENTS.md"
+fi
+
 say ""
 if [ "$dry_run" -eq 1 ]; then
   say "Dry run complete — no changes made."
