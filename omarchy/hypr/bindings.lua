@@ -220,12 +220,241 @@ o.rebind("SUPER + SHIFT + TAB", "Switch workspace back (MRU)", function()
   step_workspace(-1)
 end)
 
+-- Even grid. Floats every window on the workspace into equal cells, 2 as
+-- halves, 4 as quarters, a short last row stretched across. Releasing it puts
+-- each window back the way it was: tiled, floating, or maximized.
+-- SUPER + E toggles it; ALT + TAB shows it while Alt is held (below).
+local grid_gap_out = 10 -- general.gaps_out
+local grid_gap_in = 10 -- twice general.gaps_in
+-- Each gridded window carries tags saying it is in a grid and how it was
+-- before, so a Hyprland reload, which forgets Lua state, can't strand it
+-- floating. grid_runs only stops a stale refit from moving a newer grid.
+local GRID_TAG = "dotfiles-grid"
+local grid_runs = {}
+
+local function has_tag(window, tag)
+  for _, t in ipairs(window.tags or {}) do
+    if t == tag then
+      return true
+    end
+  end
+  return false
+end
+
+local function set_tag(target, tag, on)
+  hl.dispatch(hl.dsp.window.tag({ tag = (on and "+" or "-") .. tag, window = target }))
+end
+
+local function is_gridded(id)
+  for _, window in ipairs(hl.get_workspace_windows(tostring(id))) do
+    if has_tag(window, GRID_TAG) then
+      return true
+    end
+  end
+  return false
+end
+
+local function grid_windows(workspace_id)
+  local out = {}
+  for _, window in ipairs(hl.get_workspace_windows(tostring(workspace_id))) do
+    if window.mapped ~= false then
+      table.insert(out, window)
+    end
+  end
+  return out
+end
+
+-- With chosen set (ALT + TAB), a workspace that had a maximized or fullscreen
+-- window gives that state to the chosen one, so it isn't hidden behind the old
+-- one. Without it (SUPER + E), each window gets back its own state.
+local function grid_off(id, chosen)
+  grid_runs[id] = (grid_runs[id] or 0) + 1
+  local restore = {}
+  local cover_mode = nil
+  for _, window in ipairs(grid_windows(id)) do
+    if has_tag(window, GRID_TAG) then
+      local target = "address:" .. window.address
+      if has_tag(window, GRID_TAG .. "-tiled") then
+        hl.dispatch(hl.dsp.window.float({ action = "off", window = target }))
+      end
+      local mode = has_tag(window, GRID_TAG .. "-max") and "maximized"
+        or (has_tag(window, GRID_TAG .. "-full") and "fullscreen")
+      if mode then
+        cover_mode = cover_mode or mode
+        table.insert(restore, { target = target, mode = mode })
+      end
+      for _, tag in ipairs({ GRID_TAG, GRID_TAG .. "-tiled", GRID_TAG .. "-max", GRID_TAG .. "-full" }) do
+        if has_tag(window, tag) then
+          set_tag(target, tag, false)
+        end
+      end
+    end
+  end
+  if chosen and cover_mode then
+    restore = { { target = "address:" .. chosen, mode = cover_mode } }
+  end
+  -- Fullscreen applies to the focused window, so focus each one in turn.
+  local active = hl.get_active_window()
+  for _, item in ipairs(restore) do
+    hl.dispatch(hl.dsp.focus({ window = item.target }))
+    hl.dispatch(hl.dsp.window.fullscreen({ mode = item.mode, action = "set" }))
+  end
+  local back = chosen and ("address:" .. chosen) or (active and active.address and "address:" .. active.address)
+  if #restore > 0 and back then
+    hl.dispatch(hl.dsp.focus({ window = back }))
+  end
+end
+
+local function grid_on(id)
+  local windows = grid_windows(id)
+  local count = #windows
+  if count == 0 or is_gridded(id) then
+    return false
+  end
+  local monitor = hl.get_active_monitor()
+  if not monitor or not monitor.scale or monitor.scale <= 0 then
+    return false
+  end
+
+  local width = monitor.width / monitor.scale
+  local height = monitor.height / monitor.scale
+  if (monitor.transform or 0) % 2 == 1 then
+    width, height = height, width
+  end
+  local reserved = monitor.reserved or {}
+  local left = (monitor.x or 0) + (reserved.left or 0) + grid_gap_out
+  local top = (monitor.y or 0) + (reserved.top or 0) + grid_gap_out
+  width = width - (reserved.left or 0) - (reserved.right or 0) - grid_gap_out * 2
+  height = height - (reserved.top or 0) - (reserved.bottom or 0) - grid_gap_out * 2
+
+  local cols = math.ceil(math.sqrt(count))
+  local rows = math.ceil(count / cols)
+  local free_h = height - grid_gap_in * (rows - 1)
+  local row_h = {}
+  for r = 0, rows - 1 do
+    row_h[r] = free_h / rows
+  end
+
+  grid_runs[id] = (grid_runs[id] or 0) + 1
+  local run = grid_runs[id]
+  local cells = {}
+  for i, window in ipairs(windows) do
+    local target = "address:" .. window.address
+    set_tag(target, GRID_TAG, true)
+    if not window.floating then
+      set_tag(target, GRID_TAG .. "-tiled", true)
+    end
+    if (window.fullscreen or 0) == 1 then
+      set_tag(target, GRID_TAG .. "-max", true)
+    elseif (window.fullscreen or 0) ~= 0 then
+      set_tag(target, GRID_TAG .. "-full", true)
+    end
+    local row = math.floor((i - 1) / cols)
+    table.insert(cells, {
+      address = window.address,
+      row = row,
+      col = (i - 1) % cols,
+      in_row = math.min(cols, count - row * cols),
+    })
+    -- A maximized (ALT + M) or fullscreen window would cover the grid.
+    if (window.fullscreen or 0) ~= 0 then
+      local mode = window.fullscreen == 1 and "maximized" or "fullscreen"
+      hl.dispatch(hl.dsp.window.fullscreen({ mode = mode, action = "unset", window = target }))
+    end
+    hl.dispatch(hl.dsp.window.float({ action = "on", window = target }))
+  end
+
+  local function place()
+    local row_top = {}
+    local y = top
+    for r = 0, rows - 1 do
+      row_top[r] = y
+      y = y + row_h[r] + grid_gap_in
+    end
+    for _, cell in ipairs(cells) do
+      local cell_w = (width - grid_gap_in * (cell.in_row - 1)) / cell.in_row
+      local target = "address:" .. cell.address
+      hl.dispatch(hl.dsp.window.resize({ x = math.floor(cell_w), y = math.floor(row_h[cell.row]), relative = false, window = target }))
+      hl.dispatch(hl.dsp.window.move({
+        x = math.floor(left + cell.col * (cell_w + grid_gap_in)),
+        y = math.floor(row_top[cell.row]),
+        relative = false,
+        window = target,
+      }))
+    end
+  end
+  place()
+
+  -- Some apps keep a minimum size bigger than their cell, and only show it
+  -- once they answer the resize. A row holding one gets the height it needs
+  -- and the other rows share the rest; if that leaves them too short, the
+  -- rows stay even and the big window is only kept on screen.
+  local min_row_h = 120
+  local function refit()
+    if grid_runs[id] ~= run then
+      return
+    end
+    local need = {}
+    for _, cell in ipairs(cells) do
+      local live = hl.get_window("address:" .. cell.address)
+      if live and live.size and live.size.y > row_h[cell.row] + 1 then
+        need[cell.row] = math.max(need[cell.row] or 0, live.size.y)
+      end
+    end
+    local fixed_h, flex = 0, 0
+    for r = 0, rows - 1 do
+      if need[r] then
+        fixed_h = fixed_h + need[r]
+      else
+        flex = flex + 1
+      end
+    end
+    if fixed_h > 0 and flex > 0 and (free_h - fixed_h) / flex >= min_row_h then
+      for r = 0, rows - 1 do
+        row_h[r] = need[r] or (free_h - fixed_h) / flex
+      end
+      place()
+    end
+    for _, cell in ipairs(cells) do
+      local live = hl.get_window("address:" .. cell.address)
+      if live and live.at and live.size then
+        local x = math.max(left, math.min(live.at.x, left + width - live.size.x))
+        local y = math.max(top, math.min(live.at.y, top + height - live.size.y))
+        if math.abs(x - live.at.x) >= 1 or math.abs(y - live.at.y) >= 1 then
+          hl.dispatch(hl.dsp.window.move({ x = math.floor(x), y = math.floor(y), relative = false, window = "address:" .. cell.address }))
+        end
+      end
+    end
+  end
+  hl.timer(refit, { type = "oneshot", timeout = 150 })
+  hl.timer(refit, { type = "oneshot", timeout = 400 })
+  return true
+end
+
+local function grid_toggle()
+  local workspace = hl.get_active_workspace()
+  if not workspace then
+    return
+  end
+  if is_gridded(workspace.id) then
+    grid_off(workspace.id)
+  else
+    grid_on(workspace.id)
+  end
+end
+
+-- Reachable from `hyprctl repl 'o.grid_toggle()'` to test without the key.
+o.grid_toggle = grid_toggle
+o.bind("SUPER + E", "Even grid of the workspace's windows (toggle)", grid_toggle)
+
 local win_mru = {}
 local win_cycling = false
 local win_cycle_ws = nil
 local win_cycle_list = {}
 local win_cycle_index = 1
 local win_cycle_target = nil
+-- Workspace that ALT + TAB laid out as a grid, to put back when Alt is let go.
+local win_cycle_grid = nil
 
 local function record_win(addr)
   if not addr or addr == "" then
@@ -320,6 +549,11 @@ local function step_window(step)
     win_cycle_ws = ws.id
     win_cycle_index = 1
     win_cycling = true
+    -- Show every window while Alt is held. A grid the user made with
+    -- SUPER + E stays when Alt is let go.
+    if #win_cycle_list >= 2 and not is_gridded(ws.id) and grid_on(ws.id) then
+      win_cycle_grid = ws.id
+    end
   end
 
   if #win_cycle_list < 2 then
@@ -340,6 +574,13 @@ local function finish_win_cycle()
   win_cycling = false
   local win = hl.get_active_window()
   local final_addr = (win and win.address) or win_cycle_target
+  if win_cycle_grid then
+    grid_off(win_cycle_grid, final_addr)
+    win_cycle_grid = nil
+    if final_addr then
+      hl.dispatch(hl.dsp.focus({ window = "address:" .. final_addr }))
+    end
+  end
   if final_addr then
     record_win(final_addr)
   end
@@ -355,6 +596,10 @@ for _, key in ipairs({ "Alt_L", "Alt_R" }) do
   })
 end
 
+-- Reachable from `hyprctl repl` to test without holding the keys.
+o.alt_tab_step = step_window
+o.alt_tab_finish = finish_win_cycle
+
 o.rebind("ALT + TAB", "Focus on next window (MRU)", function()
   step_window(1)
 end)
@@ -362,86 +607,3 @@ o.rebind("ALT + SHIFT + TAB", "Focus on previous window (MRU)", function()
   step_window(-1)
 end)
 
--- SUPER + E: even grid. Floats every window on the workspace into equal cells,
--- 2 as halves, 4 as quarters, a short last row stretched across. Press again
--- to hand them back to tiling.
-local grid_gap_out = 10 -- general.gaps_out
-local grid_gap_in = 10 -- twice general.gaps_in
-local gridded = {}
-
-local function grid_windows(workspace_id)
-  local out = {}
-  for _, window in ipairs(hl.get_workspace_windows(tostring(workspace_id))) do
-    if window.mapped ~= false then
-      table.insert(out, window)
-    end
-  end
-  return out
-end
-
-local function grid_toggle()
-  local workspace = hl.get_active_workspace()
-  if not workspace then
-    return
-  end
-  local id = workspace.id
-  local windows = grid_windows(id)
-
-  if gridded[id] then
-    gridded[id] = nil
-    for _, window in ipairs(windows) do
-      hl.dispatch(hl.dsp.window.float({ action = "off", window = "address:" .. window.address }))
-    end
-    return
-  end
-
-  local count = #windows
-  if count == 0 then
-    return
-  end
-  local monitor = hl.get_active_monitor()
-  if not monitor or not monitor.scale or monitor.scale <= 0 then
-    return
-  end
-
-  local width = monitor.width / monitor.scale
-  local height = monitor.height / monitor.scale
-  if (monitor.transform or 0) % 2 == 1 then
-    width, height = height, width
-  end
-  local reserved = monitor.reserved or {}
-  local left = (monitor.x or 0) + (reserved.left or 0) + grid_gap_out
-  local top = (monitor.y or 0) + (reserved.top or 0) + grid_gap_out
-  width = width - (reserved.left or 0) - (reserved.right or 0) - grid_gap_out * 2
-  height = height - (reserved.top or 0) - (reserved.bottom or 0) - grid_gap_out * 2
-
-  local cols = math.ceil(math.sqrt(count))
-  local rows = math.ceil(count / cols)
-  local cell_h = (height - grid_gap_in * (rows - 1)) / rows
-
-  gridded[id] = true
-  for i, window in ipairs(windows) do
-    local row = math.floor((i - 1) / cols)
-    local col = (i - 1) % cols
-    local in_row = math.min(cols, count - row * cols)
-    local cell_w = (width - grid_gap_in * (in_row - 1)) / in_row
-    local target = "address:" .. window.address
-    -- A maximized (Super+M) or fullscreen window would cover the grid.
-    if (window.fullscreen or 0) ~= 0 then
-      local mode = window.fullscreen == 1 and "maximized" or "fullscreen"
-      hl.dispatch(hl.dsp.window.fullscreen({ mode = mode, action = "unset", window = target }))
-    end
-    hl.dispatch(hl.dsp.window.float({ action = "on", window = target }))
-    hl.dispatch(hl.dsp.window.resize({ x = math.floor(cell_w), y = math.floor(cell_h), relative = false, window = target }))
-    hl.dispatch(hl.dsp.window.move({
-      x = math.floor(left + col * (cell_w + grid_gap_in)),
-      y = math.floor(top + row * (cell_h + grid_gap_in)),
-      relative = false,
-      window = target,
-    }))
-  end
-end
-
--- Reachable from `hyprctl repl 'o.grid_toggle()'` to test without the key.
-o.grid_toggle = grid_toggle
-o.bind("SUPER + E", "Even grid of the workspace's windows (toggle)", grid_toggle)
