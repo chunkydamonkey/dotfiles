@@ -67,6 +67,17 @@ say "== packages (git, github-cli, git-lfs, wezterm) =="
 run "omarchy pkg add git github-cli git-lfs wezterm"
 
 say ""
+say "== browser (chrome) =="
+if [ "$dry_run" -eq 1 ]; then
+  say "  DRY-RUN> omarchy install browser chrome (if missing)"
+elif ! command -v google-chrome-stable >/dev/null 2>&1; then
+  say "Installing Google Chrome..."
+  omarchy install browser chrome
+else
+  say "ok    google-chrome"
+fi
+
+say ""
 say "== tailscale =="
 if [ "$dry_run" -eq 1 ]; then
   say "  DRY-RUN> omarchy-install-service-tailscale"

@@ -152,15 +152,26 @@ elseif is_macos then
   config.font_size = 15.0
   config.window_frame.font_size = 13.0
 elseif is_linux then
-  config.window_frame.font_size = 11.0
   -- Hyprland owns the window. The minimize, maximize, and close buttons
   -- stay on Windows, where INTEGRATED_BUTTONS is set above.
   config.window_decorations = "NONE"
-  -- The fancy tab bar is a grey titlebar strip. Hide it for a single tab.
-  -- Extra tabs use the retro bar, which takes its colors from rose-pine moon.
+  -- The fancy tab bar, recolored to rose-pine moon instead of its default
+  -- grey, so tabs can be taller with bigger text than the one-row retro bar.
+  -- Hidden while only one tab is open.
   config.hide_tab_bar_if_only_one_tab = true
-  config.use_fancy_tab_bar = false
+  config.use_fancy_tab_bar = true
   config.show_new_tab_button_in_tab_bar = false
+  config.tab_max_width = 32
+  config.window_frame.font_size = 13.0
+  config.window_frame.active_titlebar_bg = "#232136" -- base
+  config.window_frame.inactive_titlebar_bg = "#232136"
+  config.colors = config.colors or {}
+  config.colors.tab_bar = {
+    inactive_tab_edge = "#393552", -- overlay
+    active_tab = { bg_color = "#393552", fg_color = "#e0def4" }, -- overlay / text
+    inactive_tab = { bg_color = "#2a273f", fg_color = "#908caa" }, -- surface / subtle
+    inactive_tab_hover = { bg_color = "#44415a", fg_color = "#e0def4" }, -- highlight med
+  }
 end
 
 -- Cwd for a new tab/window in the given domain. WSL must use the Linux home
@@ -197,6 +208,145 @@ local function spawn_window_at_home()
   end)
 end
 
+-- Ctrl+Tab walks tabs in recent order, the same way Super+Tab walks workspaces.
+-- A tap flips the last two. Holding Ctrl and tapping Tab walks further back,
+-- Ctrl+Shift+Tab reverses, and letting go of Ctrl leaves that tab on top.
+-- Ctrl+PageUp and Ctrl+PageDown stay in left-to-right order.
+local tab_mru = {}
+local tab_cycle = {}
+
+local function record_tab(window_id, tab_id)
+  if not window_id or not tab_id or tab_cycle[window_id] then
+    return
+  end
+  local list = tab_mru[window_id] or {}
+  for i = #list, 1, -1 do
+    if list[i] == tab_id then
+      table.remove(list, i)
+    end
+  end
+  table.insert(list, 1, tab_id)
+  tab_mru[window_id] = list
+end
+
+local function commit_tab_cycle(window)
+  local window_id = window:window_id()
+  if not tab_cycle[window_id] then
+    return
+  end
+  tab_cycle[window_id] = nil
+  local tab = window:mux_window():active_tab()
+  if tab then
+    record_tab(window_id, tab:tab_id())
+  end
+end
+
+local function watch_ctrl_release(window)
+  local window_id = window:window_id()
+  local function tick()
+    if not tab_cycle[window_id] then
+      return
+    end
+    local ok, mods = pcall(function()
+      return window:keyboard_modifiers()
+    end)
+    if not ok or type(mods) ~= "string" or not mods:find("CTRL", 1, true) then
+      commit_tab_cycle(window)
+      return
+    end
+    wezterm.time.call_after(0.05, tick)
+  end
+  wezterm.time.call_after(0.05, tick)
+end
+
+local function step_recent_tab(delta)
+  return wezterm.action_callback(function(window, _pane)
+    local window_id = window:window_id()
+    local mux = window:mux_window()
+    local state = tab_cycle[window_id]
+    if not state then
+      local active = mux:active_tab()
+      if active then
+        record_tab(window_id, active:tab_id())
+      end
+      local alive = {}
+      local positional = {}
+      for _, tab in ipairs(mux:tabs()) do
+        alive[tab:tab_id()] = tab
+        table.insert(positional, tab:tab_id())
+      end
+      local list = {}
+      local seen = {}
+      local function add(tab_id)
+        if tab_id and alive[tab_id] and not seen[tab_id] then
+          seen[tab_id] = true
+          table.insert(list, tab_id)
+        end
+      end
+      if active then
+        add(active:tab_id())
+      end
+      for _, tab_id in ipairs(tab_mru[window_id] or {}) do
+        add(tab_id)
+      end
+      for _, tab_id in ipairs(positional) do
+        add(tab_id)
+      end
+      if #list < 2 then
+        return
+      end
+      state = { list = list, index = 1 }
+      tab_cycle[window_id] = state
+      watch_ctrl_release(window)
+    end
+    local count = #state.list
+    state.index = ((state.index - 1 + delta) % count) + 1
+    local target = state.list[state.index]
+    for _, tab in ipairs(mux:tabs()) do
+      if tab:tab_id() == target then
+        tab:activate()
+        return
+      end
+    end
+  end)
+end
+
+wezterm.on("update-status", function(window, _pane)
+  local window_id = window:window_id()
+  if tab_cycle[window_id] then
+    return
+  end
+  local tab = window:mux_window():active_tab()
+  if tab then
+    record_tab(window_id, tab:tab_id())
+  end
+end)
+
+-- Tab titles lead with a circled number from the Nerd Font in place of "1:":
+-- filled on the active tab, outlined on the rest, and 9+ past nine.
+local function tab_number_icon(n, active)
+  local name = n <= 9 and ("md_numeric_" .. n .. "_circle") or "md_numeric_9_plus_circle"
+  if not active then
+    name = name .. "_outline"
+  end
+  local ok, glyph = pcall(function()
+    return wezterm.nerdfonts[name]
+  end)
+  if ok and glyph then
+    return glyph
+  end
+  return n .. ":"
+end
+
+wezterm.on("format-tab-title", function(tab, _tabs, _panes, _config, _hover, max_width)
+  local title = tab.tab_title
+  if not title or #title == 0 then
+    title = tab.active_pane.title
+  end
+  local text = " " .. tab_number_icon(tab.tab_index + 1, tab.is_active) .. "  " .. title .. " "
+  return wezterm.truncate_right(text, max_width)
+end)
+
 -- ── Keys ────────────────────────────────────────────────────────────────────
 -- Same split shapes as tmux (Ctrl+b | / -), but WezTerm uses Ctrl+Shift+Alt
 -- so it doesn't steal tmux's prefix or WezTerm paste (Ctrl+Shift+V):
@@ -210,6 +360,9 @@ end
 local split_vertical = act.SplitVertical { domain = "CurrentPaneDomain" }
 local split_horizontal = act.SplitHorizontal { domain = "CurrentPaneDomain" }
 config.keys = {
+  { key = "Tab", mods = "CTRL", action = step_recent_tab(1) },
+  { key = "Tab", mods = "CTRL|SHIFT", action = step_recent_tab(-1) },
+
   { key = "|", mods = "CTRL|SHIFT|ALT", action = split_horizontal },
   { key = "\\", mods = "CTRL|SHIFT|ALT", action = split_horizontal }, -- same key unshifted on US
   { key = "-", mods = "CTRL|SHIFT|ALT", action = split_vertical },
@@ -278,22 +431,19 @@ config.keys = {
   },
 }
 
--- Numpad twins of the default Ctrl+Shift+1..9 / 0 → ActivateTab.
--- Use phys: so the chord works with NumLock on or off (with Shift held, the
--- OS often remaps Numpad1→End, Numpad2→Down, etc., which would miss a
--- logical "NumpadN" binding).
+-- Ctrl+1..9 and Ctrl+0 jump straight to that tab, like Super+1 jumps to a
+-- workspace. 1 is the leftmost tab. The number row and the numpad both work,
+-- with or without Shift. phys: keeps the numpad binding when NumLock is off.
 for i = 1, 9 do
-  table.insert(config.keys, {
-    key = "phys:Keypad" .. i,
-    mods = "CTRL|SHIFT",
-    action = act.ActivateTab(i - 1),
-  })
+  local activate = act.ActivateTab(i - 1)
+  table.insert(config.keys, { key = tostring(i), mods = "CTRL", action = activate })
+  table.insert(config.keys, { key = "phys:Keypad" .. i, mods = "CTRL", action = activate })
+  table.insert(config.keys, { key = "phys:Keypad" .. i, mods = "CTRL|SHIFT", action = activate })
 end
-table.insert(config.keys, {
-  key = "phys:Keypad0",
-  mods = "CTRL|SHIFT",
-  action = act.ActivateTab(9),
-})
+local activate_tenth = act.ActivateTab(9)
+table.insert(config.keys, { key = "0", mods = "CTRL", action = activate_tenth })
+table.insert(config.keys, { key = "phys:Keypad0", mods = "CTRL", action = activate_tenth })
+table.insert(config.keys, { key = "phys:Keypad0", mods = "CTRL|SHIFT", action = activate_tenth })
 
 -- Right-click paste (handy when keys fight you)
 config.mouse_bindings = {
