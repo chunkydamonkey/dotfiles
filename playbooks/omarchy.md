@@ -18,6 +18,7 @@ Use this when `/etc/os-release` has `ID=omarchy`. Run `./setup.sh`. It dispatche
 - Link `wezterm/` to `~/.config/wezterm`, install `omarchy/org.wezfurlong.wezterm.desktop` so Super+Return can pass a working directory, and put that desktop id first in `~/.config/xdg-terminals.list`. `omarchy default terminal` cannot name WezTerm; this list is how Omarchy launches it.
 - Set Google Chrome as default browser (`google-chrome.desktop`) via `xdg-settings` / `omarchy default browser chrome`.
 - Link `omarchy/hypr/bindings.lua` and `omarchy/hypr/input.lua` into `~/.config/hypr/` (vim-style Super+h/j/k/l focus and swap, Super+M full width, Windows-style recent Super+Tab and Alt+Tab, three-finger workspace swipe). After `omarchy refresh hyprland`, re-run `omarchy/install.sh` so the links come back.
+- Link `omarchy/shell/plugins/chuche.workspaces` into `~/.config/omarchy/plugins/` and switch the bar to it with `omarchy plugin enable chuche.workspaces`. It shows an icon per window beside each workspace number and underlines the focused workspace, with a thicker stretch under the focused window. After `omarchy refresh shell`, re-run `omarchy/install.sh`. Edits to the widget need `omarchy restart shell` to show.
 
 ## Ask first
 
