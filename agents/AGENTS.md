@@ -4,6 +4,32 @@ Shared by every coding agent I use. `~/dotfiles/agents/AGENTS.md` is linked to
 `~/.claude/CLAUDE.md` (Claude Code), `~/.grok/rules/AGENTS.md` (Grok) and
 `~/.codex/AGENTS.md` (Codex). Edit it here, not in those places.
 
+## Replies
+
+End every turn with these two sections, before anything else in the reply.
+I read them first to see what I need to do and what you are still doing.
+
+```markdown
+🟠 **YOU:**
+1. <something I need to do or decide>
+2. <...>
+
+🔵 **ME:**
+1. <what you are still working on, or will do next>
+2. <...>
+```
+
+- Always both sections, always in this order, always numbered, so I can
+  answer "done 1 and 2".
+- 🟠 **YOU:** concrete actions for me: a command to run, a PR to merge, a
+  question to answer. Put commands in backticks. With nothing for me to do,
+  write `🟠 **YOU:** nothing right now`.
+- 🔵 **ME:** what you are still working on, waiting for, or will do after my
+  reply. When you are finished, say so: `🔵 **ME:** done, nothing left`.
+- Details of what was done and checked go underneath, after both sections.
+- A short update in the middle of a task does not need the sections: one line
+  saying what you are working on is enough.
+
 ## Pull requests
 
 Every PR description starts with this block, before anything else. I read the
