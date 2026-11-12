@@ -23,9 +23,14 @@ o.rebind("SUPER + J", "Focus on below window", hl.dsp.focus({ direction = "d" })
 o.rebind("SUPER + K", "Focus on above window", hl.dsp.focus({ direction = "u" }))
 o.rebind("SUPER + L", "Focus on right window", hl.dsp.focus({ direction = "r" }))
 
--- ALT + M: full width (same as SUPER + ALT + F), next to ALT + TAB.
+-- ALT + M and ALT + `: full width (same as SUPER + ALT + F), next to ALT + TAB.
 -- SUPER + M keeps Omarchy's minimize to the dock.
 o.bind("ALT + M", "Full width", hl.dsp.window.fullscreen({ mode = "maximized" }))
+o.bind("ALT + grave", "Full width", hl.dsp.window.fullscreen({ mode = "maximized" }))
+
+-- SUPER + CTRL + RETURN: herdr in foot, Omarchy's stock terminal, rather than
+-- through xdg-terminal-exec, which picks WezTerm.
+o.rebind("SUPER + CTRL + RETURN", "Herdr", "setsid uwsm-app -- foot herdr")
 
 -- Same as SUPER + SHIFT + arrows.
 o.bind("SUPER + SHIFT + H", "Swap window to the left", hl.dsp.window.swap({ direction = "l" }))
@@ -446,6 +451,24 @@ end
 -- Reachable from `hyprctl repl 'o.grid_toggle()'` to test without the key.
 o.grid_toggle = grid_toggle
 o.bind("SUPER + E", "Even grid of the workspace's windows (toggle)", grid_toggle)
+-- Three-finger swipe up shows the grid and swipe down puts the windows back,
+-- once the swipe finishes. Each does nothing when there is nothing to do.
+local function grid_show()
+  local workspace = hl.get_active_workspace()
+  if workspace and not is_gridded(workspace.id) then
+    grid_on(workspace.id)
+  end
+end
+
+local function grid_hide()
+  local workspace = hl.get_active_workspace()
+  if workspace and is_gridded(workspace.id) then
+    grid_off(workspace.id)
+  end
+end
+
+hl.gesture({ fingers = 3, direction = "up", action = { finish = grid_show } })
+hl.gesture({ fingers = 3, direction = "down", action = { finish = grid_hide } })
 
 local win_mru = {}
 local win_cycling = false
